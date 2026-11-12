@@ -340,31 +340,31 @@ export function Experience() {
       layer.replaceChildren();
       const colors = ['#b3122f', '#8b6bd1', '#e0405a', '#a58ae0', '#c9184a', '#c9b6f2', '#f3d7a2', '#ff9fb0', '#ff6f91', '#ffb3c1'];
       const burst = (count: number, delayBase: number, power = 1) => {
+        const frag = document.createDocumentFragment();
         for (let i = 0; i < count; i += 1) {
           const piece = document.createElement('span');
           const r = Math.random();
-          const isFlower = r < 0.55;
-          const isPetal = !isFlower && r < 0.78;
+          const isFlower = r < 0.5;
+          const isPetal = !isFlower && r < 0.75;
           const isStar = !isFlower && !isPetal && r < 0.9;
-          const size = isFlower ? 14 + Math.random() * 18 : isPetal ? 10 + Math.random() * 12 : 6 + Math.random() * 10;
+          const size = isFlower ? 14 + Math.random() * 14 : isPetal ? 10 + Math.random() * 10 : 6 + Math.random() * 8;
           piece.className = isFlower ? 'confetti confetti--flower' : isPetal ? 'confetti confetti--petal' : isStar ? 'confetti confetti--star' : 'confetti';
           piece.style.left = `${Math.random() * 100}%`;
           piece.style.width = `${size}px`;
           piece.style.height = isFlower ? `${size * 1.25}px` : isPetal ? `${size * 1.3}px` : `${size * (0.5 + Math.random() * 0.7)}px`;
           piece.style.background = colors[i % colors.length];
-          piece.style.animationDelay = `${delayBase + Math.random() * 0.8}s`;
-          piece.style.animationDuration = `${3.6 + Math.random() * 3.2}s`;
-          piece.style.setProperty('--drift', `${(Math.random() - 0.5) * (420 * power)}px`);
-          piece.style.setProperty('--spin', `${Math.random() * 1440 - 720}deg`);
-          layer.appendChild(piece);
+          piece.style.animationDelay = `${delayBase + Math.random() * 0.6}s`;
+          piece.style.animationDuration = `${3.2 + Math.random() * 2.4}s`;
+          piece.style.setProperty('--drift', `${(Math.random() - 0.5) * (320 * power)}px`);
+          piece.style.setProperty('--spin', `${Math.random() * 1080 - 540}deg`);
+          frag.appendChild(piece);
         }
+        layer.appendChild(frag);
       };
-      burst(180, 0, 1.1);
-      window.setTimeout(() => burst(140, 0.35, 1.2), 350);
-      window.setTimeout(() => burst(160, 0.75, 1.25), 900);
-      window.setTimeout(() => burst(120, 1.15, 1.1), 1500);
-      window.setTimeout(() => burst(100, 1.6, 1), 2200);
-      window.setTimeout(() => layer.replaceChildren(), 12000);
+      burst(70, 0, 1);
+      window.setTimeout(() => burst(50, 0.4, 1.05), 400);
+      window.setTimeout(() => burst(40, 0.8, 1), 900);
+      window.setTimeout(() => layer.replaceChildren(), 7000);
     };
     (window as any).__spawnPartyBlast = spawnCelebration;
 
@@ -422,14 +422,14 @@ export function Experience() {
       setTransform('[data-envelope]', `translateY(${-54 * smooth(0,0.09,p) - 170 * introOut}px) rotate(${-2 * smooth(0,0.09,p) - 9 * introOut}deg) scale(${1 + 0.03 * smooth(0,0.09,p) + 0.08 * introOut})`, 1 - introOut);
 
       const dubaiIn = smooth(0.095, 0.13, p);
-      const dubaiOut = smooth(0.206, 0.224, p);
+      const dubaiOut = smooth(0.132, 0.15, p);
       q('.chapter--dubai [data-copy]').forEach((el, i) => {
         const y = (1 - dubaiIn) * 40 - dubaiOut * 30;
         el.style.opacity = String(clamp01(dubaiIn * (1 - dubaiOut)));
         el.style.transform = `translateY(${y + i * 2}px)`;
       });
       const parcelDrop = smooth(0.094, 0.148, p);
-      const parcelOut = smooth(0.206, 0.224, p);
+      const parcelOut = smooth(0.132, 0.15, p);
       setTransform('[data-parcel]', `translateY(${-260 * (1 - parcelDrop) + 90 * parcelOut}px) rotate(${-11 * (1 - parcelDrop) + 7 * parcelOut}deg) scale(${0.82 + 0.18 * parcelDrop - 0.1 * parcelOut})`, parcelDrop * (1 - parcelOut));
 
       const takeU = clamp01((p - 0.155) / 0.11);
@@ -457,21 +457,21 @@ export function Experience() {
         storyAudio.stopCruise();
         if (p < 0.155) { takeoffSoundStarted = false; flightRef.current?.setTakeoff(0); }
       }
-      setOpacity('[data-flight-hud]', smooth(0.24, 0.27, p) * (1 - smooth(0.735, 0.765, p)));
-      q('.chapter--journey [data-copy]').forEach((el) => { el.style.opacity = String(smooth(0.23,0.26,p)*(1-smooth(0.284,0.3,p))); el.style.transform = `translateY(${(1-smooth(0.23,0.26,p))*40}px)`; });
+      setOpacity('[data-flight-hud]', smooth(0.27, 0.3, p) * (1 - smooth(0.735, 0.765, p)));
+      q('.chapter--journey [data-copy]').forEach((el) => { el.style.opacity = String(smooth(0.27,0.3,p)*(1-smooth(0.32,0.34,p))); el.style.transform = `translateY(${(1-smooth(0.27,0.3,p))*40}px)`; });
 
-      const bloomIn = smooth(0.566, 0.60, p);
-      const bloomOut = smooth(0.659, 0.68, p);
+      const bloomIn = smooth(0.385, 0.41, p);
+      const bloomOut = smooth(0.5, 0.53, p);
       setTransform('[data-garden]', `translateY(${50 * (1 - bloomIn) + 48 * bloomOut}px) scale(${0.94 + 0.06 * bloomIn + 0.04 * bloomOut})`, bloomIn * (1 - bloomOut));
       if (bloomIn > 0.5 && !bloomBarkDone) { bloomBarkDone = true; }
-      q('[data-bloom-item]').forEach((el, i) => { const bi = smooth(0.558 + i*0.004, 0.60 + i*0.004, p) * (1 - smooth(0.662,0.68,p)); el.style.opacity = String(clamp01(bi)); el.style.transform = `scale(${0.5 + 0.5*bi})`; });
-      q('.chapter--bloom [data-copy]').forEach((el)=>{ const o=smooth(0.566,0.59,p)*(1-smooth(0.659,0.675,p)); el.style.opacity=String(clamp01(o)); el.style.transform=`translateY(${(1-smooth(0.566,0.59,p))*40}px)`; });
+      q('[data-bloom-item]').forEach((el, i) => { const bi = smooth(0.377 + i*0.004, 0.41 + i*0.004, p) * (1 - smooth(0.502,0.53,p)); el.style.opacity = String(clamp01(bi)); el.style.transform = `scale(${0.5 + 0.5*bi})`; });
+      q('.chapter--bloom [data-copy]').forEach((el)=>{ const o=smooth(0.387,0.412,p)*(1-smooth(0.495,0.52,p)); el.style.opacity=String(clamp01(o)); el.style.transform=`translateY(${(1-smooth(0.387,0.412,p))*40}px)`; });
 
-      const arrIn = smooth(0.686, 0.71, p);
-      const arrOut = smooth(0.782, 0.8, p);
+      const arrIn = smooth(0.54, 0.565, p);
+      const arrOut = smooth(0.615, 0.64, p);
       setTransform('[data-arrival]', `translateY(${52 * arrOut}px) scale(${1 - 0.03 * arrOut})`, arrIn * (1 - arrOut));
       setTransform('[data-arrival-parcel]', `translateY(${-300 * (1 - arrIn)}px) scale(${0.84 + 0.16 * arrIn})`, arrIn);
-      q('.chapter--arrival [data-copy]').forEach((el)=>{ const o=smooth(0.686,0.71,p)*(1-smooth(0.782,0.8,p)); el.style.opacity=String(clamp01(o)); el.style.transform=`translateY(${(1-smooth(0.686,0.71,p))*40}px)`; });
+      q('.chapter--arrival [data-copy]').forEach((el)=>{ const o=smooth(0.54,0.565,p)*(1-smooth(0.615,0.64,p)); el.style.opacity=String(clamp01(o)); el.style.transform=`translateY(${(1-smooth(0.54,0.565,p))*40}px)`; });
 
       if (!cutscene && !doorAutoDone && p >= 0.755) {
         doorAutoDone = true;

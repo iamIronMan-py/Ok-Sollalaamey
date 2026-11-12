@@ -1467,7 +1467,10 @@ export class FlightWorld {
     if (this.disposed) return;
     const u = clamp01(value);
     if (u >= 1) {
-      this.setProgress(0);
+      this.plane.position.copy(this.cruisePlanePosition);
+      this.plane.quaternion.copy(this.cruisePlaneQuaternion);
+      this.camera.position.copy(this.cruiseCameraPosition);
+      this.camera.lookAt(this.cruiseLookAt);
       return;
     }
 
