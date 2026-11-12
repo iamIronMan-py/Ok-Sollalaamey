@@ -242,11 +242,12 @@ function placeLandmark(
   viewWidth: number,
   draw: () => void,
   widthFactor = 1,
+  heightFactor = 1,
 ) {
   const scale = height / VIEW_HEIGHT;
   ctx.save();
   ctx.translate(x, baseY);
-  ctx.scale(scale * widthFactor, scale);
+  ctx.scale(scale * widthFactor, scale * heightFactor);
   ctx.translate(-viewWidth / 2, -VIEW_HEIGHT);
   draw();
   ctx.restore();
@@ -336,7 +337,7 @@ function drawBurjAlArab(ctx: CanvasRenderingContext2D, x: number, baseY: number,
     ctx.stroke();
 
     ctx.globalAlpha = 1;
-  }, 0.78);
+  }, 0.78, 1.15);
 }
 
 function drawEiffel(ctx: CanvasRenderingContext2D, x: number, baseY: number, height: number, color: string, accent: string) {
@@ -383,7 +384,7 @@ function drawEiffel(ctx: CanvasRenderingContext2D, x: number, baseY: number, hei
     ctx.stroke();
 
     ctx.globalAlpha = 1;
-  }, 0.82);
+  }, 0.82, 1);
 }
 
 function drawPantheon(ctx: CanvasRenderingContext2D, x: number, baseY: number, height: number, color: string, accent: string) {
