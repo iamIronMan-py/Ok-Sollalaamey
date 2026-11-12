@@ -11,14 +11,14 @@ export type SkylineLayerSpec = {
 
 export const SKYLINE_LAYERS: Record<SkylineKind, SkylineLayerSpec[]> = {
   dubai: [
-    { layer: 'far', depth: 1200, worldWidth: 1400, worldHeight: 108, opacity: 0.62 },
-    { layer: 'mid', depth: 980, worldWidth: 1180, worldHeight: 122, opacity: 0.8 },
-    { layer: 'near', depth: 760, worldWidth: 960, worldHeight: 138, opacity: 1 },
+    { layer: 'far', depth: 1200, worldWidth: 1800, worldHeight: 112, opacity: 0.78 },
+    { layer: 'mid', depth: 980, worldWidth: 1600, worldHeight: 128, opacity: 0.92 },
+    { layer: 'near', depth: 760, worldWidth: 1400, worldHeight: 146, opacity: 1 },
   ],
   paris: [
-    { layer: 'far', depth: 1200, worldWidth: 1400, worldHeight: 106, opacity: 0.62 },
-    { layer: 'mid', depth: 980, worldWidth: 1180, worldHeight: 120, opacity: 0.8 },
-    { layer: 'near', depth: 760, worldWidth: 980, worldHeight: 136, opacity: 1 },
+    { layer: 'far', depth: 1200, worldWidth: 1800, worldHeight: 110, opacity: 0.78 },
+    { layer: 'mid', depth: 980, worldWidth: 1600, worldHeight: 126, opacity: 0.92 },
+    { layer: 'near', depth: 760, worldWidth: 1400, worldHeight: 144, opacity: 1 },
   ],
 };
 
@@ -214,13 +214,13 @@ function mulberry32(seed: number) {
 
 function paletteFor(kind: SkylineKind, layer: SkylineLayer): Palette {
   if (kind === 'dubai') {
-    if (layer === 'far') return { fill: '#7b92d4', accent: '#a0b4e8' };
-    if (layer === 'mid') return { fill: '#5069b8', accent: '#7e93d8' };
-    return { fill: '#2f4b93', accent: '#6580cc', window: 'rgba(255,209,128,0.95)' };
+    if (layer === 'far') return { fill: '#4f6fe0', accent: '#9ec0ff', window: 'rgba(255,220,140,0.55)' };
+    if (layer === 'mid') return { fill: '#3452c9', accent: '#7fd4ff', window: 'rgba(255,214,120,0.78)' };
+    return { fill: '#1f3ea8', accent: '#52e0ff', window: 'rgba(255,230,150,0.98)' };
   }
-  if (layer === 'far') return { fill: '#dcc5b2', accent: '#f0dcc6' };
-  if (layer === 'mid') return { fill: '#c6a58f', accent: '#e0c6ac' };
-  return { fill: '#a4836f', accent: '#cdae90', window: 'rgba(255,216,152,0.92)' };
+  if (layer === 'far') return { fill: '#caa07a', accent: '#ffd9a8', window: 'rgba(255,220,150,0.5)' };
+  if (layer === 'mid') return { fill: '#b07a55', accent: '#ffc98a', window: 'rgba(255,210,140,0.75)' };
+  return { fill: '#8a5638', accent: '#ffcf8c', window: 'rgba(255,226,160,0.98)' };
 }
 
 function fillPolygon(ctx: CanvasRenderingContext2D, points: number[], fill: string) {
@@ -425,68 +425,121 @@ function drawFillers(
   canvasHeight: number,
 ) {
   const rand = mulberry32(kind === 'dubai' ? 1301 + layer.length * 37 : 2903 + layer.length * 53);
-  const count = mobile ? 12 : layer === 'far' ? 34 : 26;
-  let x = -30;
+  const count = mobile ? 20 : layer === 'far' ? 44 : 36;
+  const isNear = layer === 'near';
+  let x = -80;
   for (let i = 0; i < count; i += 1) {
-    const buildingWidth = kind === 'dubai' ? 14 + rand() * 34 : 24 + rand() * 52;
-    const ratio = kind === 'dubai' ? 0.12 + rand() * 0.36 : 0.06 + rand() * 0.2;
-    const buildingHeight = canvasHeight * ratio * (layer === 'far' ? 0.86 : 1);
-    ctx.fillStyle = palette.fill;
-    ctx.fillRect(x, baseY - buildingHeight, buildingWidth, buildingHeight);
+    const buildingWidth = kind === 'dubai' ? 16 + rand() * 38 : 22 + rand() * 56;
+    const ratio = kind === 'dubai' ? 0.14 + rand() * 0.4 : 0.08 + rand() * 0.22;
+    const buildingHeight = canvasHeight * ratio * (layer === 'far' ? 0.9 : 1.04);
+    const bx = x;
+    const by = baseY - buildingHeight;
+
+    const grad = ctx.createLinearGradient(bx, by, bx, baseY);
     if (kind === 'dubai') {
-      if (rand() > 0.5) {
-        ctx.fillRect(x + buildingWidth * 0.18, baseY - buildingHeight - 8 - rand() * 22, buildingWidth * 0.64, 11);
+      grad.addColorStop(0, palette.accent);
+      grad.addColorStop(0.35, palette.fill);
+      grad.addColorStop(1, layer === 'far' ? '#3550b8' : '#162a78');
+    } else {
+      grad.addColorStop(0, palette.accent);
+      grad.addColorStop(0.4, palette.fill);
+      grad.addColorStop(1, layer === 'far' ? '#8b6246' : '#5a3524');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, buildingWidth, buildingHeight);
+
+    ctx.fillStyle = kind === 'dubai' ? 'rgba(200,235,255,0.18)' : 'rgba(255,240,210,0.16)';
+    ctx.fillRect(bx, by, Math.max(2, buildingWidth * 0.08), buildingHeight);
+
+    if (kind === 'dubai') {
+      if (rand() > 0.45) {
+        const capH = 8 + rand() * 18;
+        ctx.fillStyle = palette.accent;
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(bx + buildingWidth * 0.18, by - capH, buildingWidth * 0.64, capH);
+        ctx.globalAlpha = 1;
       }
-      if (rand() > 0.68) {
-        ctx.fillRect(x + buildingWidth * 0.46, baseY - buildingHeight - 34, Math.max(2, buildingWidth * 0.08), 27);
+      if (rand() > 0.6) {
+        const spireH = 18 + rand() * 30;
+        const spireW = Math.max(2, buildingWidth * 0.08);
+        ctx.fillStyle = palette.accent;
+        ctx.fillRect(bx + buildingWidth * 0.46, by - spireH, spireW, spireH);
+        if (isNear) {
+          ctx.fillStyle = 'rgba(120,240,255,0.95)';
+          ctx.fillRect(bx + buildingWidth * 0.46 - 1, by - spireH - 2, spireW + 2, 2);
+        }
       }
-      if (layer === 'near' && !mobile && palette.window) {
+      if (palette.window && layer !== 'far') {
         ctx.fillStyle = palette.window;
-        for (let wy = baseY - buildingHeight + 10; wy < baseY - 6; wy += 13) {
-          for (let wx = x + 5; wx < x + buildingWidth - 4; wx += 11) {
-            if (rand() > 0.62) ctx.fillRect(wx, wy, 2, 3);
+        for (let wy = by + 10; wy < baseY - 6; wy += isNear ? 12 : 14) {
+          for (let wx = bx + 4; wx < bx + buildingWidth - 4; wx += isNear ? 10 : 12) {
+            if (rand() > (isNear ? 0.48 : 0.58)) ctx.fillRect(wx, wy, 2.2, 3.2);
           }
         }
-        ctx.fillStyle = palette.fill;
+      }
+      if (isNear) {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = 'rgba(120,230,255,0.9)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx + 0.5, by + 0.5, buildingWidth - 1, buildingHeight - 1);
+        ctx.restore();
       }
     } else {
-      ctx.fillStyle = palette.fill;
-      ctx.fillRect(x, baseY - buildingHeight, buildingWidth, buildingHeight);
       ctx.fillStyle = palette.accent;
-      ctx.fillRect(x, baseY - buildingHeight - 3, buildingWidth, 3);
-      const roofLift = 10 + rand() * 14;
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(bx, by - 3, buildingWidth, 3);
+      ctx.globalAlpha = 1;
+      const roofLift = 10 + rand() * 16;
       ctx.beginPath();
-      ctx.moveTo(x - 2, baseY - buildingHeight);
-      ctx.lineTo(x + buildingWidth * 0.16, baseY - buildingHeight - roofLift);
-      ctx.lineTo(x + buildingWidth * 0.84, baseY - buildingHeight - roofLift);
-      ctx.lineTo(x + buildingWidth + 2, baseY - buildingHeight);
+      ctx.moveTo(bx - 2, by);
+      ctx.lineTo(bx + buildingWidth * 0.16, by - roofLift);
+      ctx.lineTo(bx + buildingWidth * 0.84, by - roofLift);
+      ctx.lineTo(bx + buildingWidth + 2, by);
       ctx.closePath();
+      ctx.fillStyle = palette.accent;
       ctx.fill();
-      if (rand() > 0.45) {
-        ctx.fillRect(x + buildingWidth * (0.2 + rand() * 0.5), baseY - buildingHeight - roofLift - 9, 2.6, 10);
+      if (rand() > 0.4) {
+        ctx.fillStyle = layer === 'near' ? '#5b3a2c' : '#6b4636';
+        ctx.fillRect(bx + buildingWidth * (0.2 + rand() * 0.5), by - roofLift - 10, 2.8, 11);
       }
       if (!mobile) {
-        ctx.fillStyle = 'rgba(58, 42, 54, 0.28)';
-        for (let dx = 0.2; dx < 0.9; dx += 0.24) {
-          ctx.fillRect(x + buildingWidth * dx, baseY - buildingHeight - roofLift * 0.72, 4, 6);
+        ctx.fillStyle = 'rgba(58, 42, 54, 0.22)';
+        for (let dx = 0.22; dx < 0.88; dx += 0.22) {
+          ctx.fillRect(bx + buildingWidth * dx, by - roofLift * 0.7, 4, 6);
         }
       }
-      if (layer === 'near' && !mobile && palette.window) {
+      if (palette.window && layer !== 'far') {
         ctx.fillStyle = palette.window;
-        for (let wy = baseY - buildingHeight + 12; wy < baseY - 8; wy += 16) {
-          for (let wx = x + 5; wx < x + buildingWidth - 4; wx += 12) {
-            if (rand() > 0.66) ctx.fillRect(wx, wy, 2.4, 3.4);
+        for (let wy = by + 12; wy < baseY - 8; wy += isNear ? 15 : 17) {
+          for (let wx = bx + 5; wx < bx + buildingWidth - 4; wx += isNear ? 11 : 13) {
+            if (rand() > (isNear ? 0.5 : 0.62)) ctx.fillRect(wx, wy, 2.6, 3.8);
           }
         }
-        ctx.fillStyle = 'rgba(74, 50, 58, 0.4)';
-        for (let wy = baseY - buildingHeight + 12; wy < baseY - 8; wy += 16) {
-          ctx.fillRect(x + 2, wy + 4.4, buildingWidth - 4, 1);
+        ctx.fillStyle = 'rgba(74, 50, 58, 0.35)';
+        for (let wy = by + 12; wy < baseY - 8; wy += isNear ? 15 : 17) {
+          ctx.fillRect(bx + 2, wy + 4.6, buildingWidth - 4, 1);
         }
-        ctx.fillStyle = palette.fill;
+      }
+      if (isNear) {
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = 'rgba(255,220,150,0.35)';
+        ctx.fillRect(bx, by + buildingHeight - 6, buildingWidth, 6);
+        ctx.restore();
       }
     }
-    x += buildingWidth + 6 + rand() * 18;
-    if (x > width) x = -20 - rand() * 60;
+
+    if (isNear) {
+      const halo = ctx.createRadialGradient(bx + buildingWidth / 2, baseY - 4, 2, bx + buildingWidth / 2, baseY - 4, buildingWidth * 0.9);
+      halo.addColorStop(0, kind === 'dubai' ? 'rgba(120,220,255,0.22)' : 'rgba(255,210,140,0.22)');
+      halo.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(bx - buildingWidth * 0.3, baseY - 30, buildingWidth * 1.6, 34);
+    }
+
+    x += buildingWidth + 4 + rand() * 14;
+    if (x > width + 80) x = -80 - rand() * 40;
   }
 }
 
@@ -514,11 +567,32 @@ export function createSkylineCanvas(kind: SkylineKind, layer: SkylineLayer, mobi
     }
   }
 
-  const glow = ctx.createLinearGradient(0, baseY, 0, baseY - height * 0.3);
-  glow.addColorStop(0, 'rgba(255, 191, 150, 0.06)');
-  glow.addColorStop(1, 'rgba(255, 191, 150, 0)');
+  const glow = ctx.createLinearGradient(0, baseY, 0, baseY - height * 0.45);
+  if (kind === 'dubai') {
+    glow.addColorStop(0, 'rgba(120, 210, 255, 0.22)');
+    glow.addColorStop(0.45, 'rgba(255, 210, 140, 0.12)');
+    glow.addColorStop(1, 'rgba(255, 191, 150, 0)');
+  } else {
+    glow.addColorStop(0, 'rgba(255, 210, 150, 0.22)');
+    glow.addColorStop(0.5, 'rgba(255, 180, 120, 0.1)');
+    glow.addColorStop(1, 'rgba(255, 191, 150, 0)');
+  }
   ctx.fillStyle = glow;
-  ctx.fillRect(0, baseY - height * 0.3, width, height * 0.3);
+  ctx.fillRect(0, baseY - height * 0.45, width, height * 0.45);
+
+  if (layer === 'near') {
+    for (let i = 0; i < (mobile ? 10 : 18); i += 1) {
+      const lx = (i / (mobile ? 9 : 17)) * width + (i % 2 ? 12 : -12);
+      const ly = baseY - height * (0.08 + (i % 5) * 0.05);
+      const rg = ctx.createRadialGradient(lx, ly, 0, lx, ly, mobile ? 26 : 34);
+      rg.addColorStop(0, kind === 'dubai' ? 'rgba(170,245,255,0.22)' : 'rgba(255,230,170,0.22)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(lx, ly, mobile ? 26 : 34, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   return canvas;
 }

@@ -164,6 +164,7 @@ export class FlightWorld {
   private moonSprite!: THREE.Sprite;
   private engineFans: THREE.Mesh[] = [];
   private navLights: THREE.MeshStandardMaterial[] = [];
+  private citySparks: Array<{ material: THREE.SpriteMaterial; base: number; phase: number; speed: number; kind: SkylineKind }> = [];
 
   constructor(canvas: HTMLCanvasElement, options: FlightWorldOptions = {}) {
     this.mobile = Boolean(options.mobile);
@@ -290,44 +291,100 @@ export class FlightWorld {
     group: THREE.Group,
     origin: THREE.Vector3,
     outDir: THREE.Vector3,
-    list: Array<{ material: THREE.MeshBasicMaterial; opacity: number }>,
-    dynamic: boolean,
+    materials: Array<{ material: THREE.MeshBasicMaterial; opacity: number }>,
+    centerAligned: boolean,
   ) {
-    const specs = this.mobile
+    const layers = this.mobile
       ? SKYLINE_LAYERS[kind].filter((spec) => spec.layer !== 'far')
       : SKYLINE_LAYERS[kind];
     const baseY = kind === 'dubai' ? this.groundY : this.parisSurfaceY;
     const yaw = Math.atan2(-outDir.x, -outDir.z);
 
-    for (const spec of specs) {
-      const canvas = createSkylineCanvas(kind, spec.layer, this.mobile);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.generateMipmaps = false;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-
-      const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: spec.opacity,
-        depthWrite: false,
-        fog: false,
-        toneMapped: false,
-        side: THREE.DoubleSide,
-      });
-      const geometry = new THREE.PlaneGeometry(spec.worldWidth, spec.worldHeight);
-      const mesh = new THREE.Mesh(geometry, material);
-      if (dynamic) {
-        mesh.position.set(0, baseY + spec.worldHeight / 2 - 4, -spec.depth);
-      } else {
-        mesh.position.copy(origin).addScaledVector(outDir, spec.depth);
-        mesh.position.y = baseY + spec.worldHeight / 2 - 4;
-        mesh.rotation.y = yaw;
+    const sparkCanvas = document.createElement('canvas');
+    sparkCanvas.width = 64;
+    sparkCanvas.height = 64;
+    const sctx = sparkCanvas.getContext('2d');
+    if (sctx) {
+      const g = sctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.25, kind === 'dubai' ? 'rgba(180,245,255,1)' : 'rgba(255,235,190,1)');
+      g.addColorStop(0.55, kind === 'dubai' ? 'rgba(120,220,255,0.8)' : 'rgba(255,210,140,0.8)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      sctx.fillStyle = g;
+      sctx.beginPath();
+      const o = 28, inr = 10;
+      for (let i = 0; i < 10; i += 1) {
+        const r = i % 2 === 0 ? o : inr;
+        const a = (i * Math.PI) / 5 - Math.PI / 2;
+        sctx.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
       }
-      group.add(mesh);
-      list.push({ material, opacity: spec.opacity });
-      this.disposables.push(texture, geometry, material);
+      sctx.closePath();
+      sctx.fill();
+    }
+    const sparkTexture = new THREE.CanvasTexture(sparkCanvas);
+    sparkTexture.colorSpace = THREE.SRGBColorSpace;
+    this.disposables.push(sparkTexture);
+
+    for (const spec of layers) {
+      for (const offset of [-1, 0, 1]) {
+        const canvas = createSkylineCanvas(kind, spec.layer, this.mobile);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          opacity: spec.opacity,
+          fog: false,
+          toneMapped: false,
+        });
+        const geometry = new THREE.PlaneGeometry(spec.worldWidth, spec.worldHeight);
+        const mesh = new THREE.Mesh(geometry, material);
+        if (centerAligned) {
+          mesh.position.set(offset * spec.worldWidth, baseY + spec.worldHeight / 2 - 4, -spec.depth);
+        } else {
+          mesh.position.copy(origin).addScaledVector(outDir, spec.depth);
+          mesh.position.y = baseY + spec.worldHeight / 2 - 4;
+          mesh.rotation.y = yaw;
+          mesh.position.add(new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).multiplyScalar(offset * spec.worldWidth));
+        }
+        group.add(mesh);
+        materials.push({ material, opacity: spec.opacity });
+        this.disposables.push(texture, material, geometry);
+
+        const sparkCount = spec.layer === 'near' ? (this.mobile ? 26 : 48) : (this.mobile ? 16 : 30);
+        for (let i = 0; i < sparkCount; i += 1) {
+          const sm = new THREE.SpriteMaterial({
+            map: sparkTexture,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            toneMapped: false,
+            fog: false,
+            color: 0xffffff,
+          });
+          const sprite = new THREE.Sprite(sm);
+          const sx = (Math.random() - 0.5) * spec.worldWidth * 0.92;
+          const sy = baseY + 6 + Math.random() * (spec.worldHeight * 0.75);
+          if (centerAligned) {
+            sprite.position.set(offset * spec.worldWidth + sx, sy, -spec.depth + 0.5);
+          } else {
+            sprite.position.copy(origin).addScaledVector(outDir, spec.depth - 0.5);
+            sprite.position.y = sy;
+            const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+            sprite.position.addScaledVector(right, offset * spec.worldWidth + sx);
+          }
+          const scale = spec.layer === 'near' ? 2.6 + Math.random() * 3.2 : 2 + Math.random() * 2.4;
+          sprite.scale.set(scale, scale, 1);
+          group.add(sprite);
+          this.citySparks.push({ material: sm, base: 0.75 + Math.random() * 0.45, phase: Math.random() * Math.PI * 2, speed: 1.8 + Math.random() * 4.2, kind });
+          this.disposables.push(sm);
+        }
+      }
     }
   }
 
@@ -345,6 +402,22 @@ export class FlightWorld {
     for (const { material, opacity } of list) {
       material.opacity = opacity * amount;
     }
+  }
+
+  private updateCitySparks() {
+    const now = performance.now() * 0.001;
+    const dubaiFade = this.dubaiSkyline.visible
+      ? (this.dubaiSkylineMaterials[0] ? this.dubaiSkylineMaterials[0].material.opacity / (this.dubaiSkylineMaterials[0].opacity || 1) : 0)
+      : 0;
+    const parisFade = this.parisSkyline.visible
+      ? (this.parisSkylineMaterials[0] ? this.parisSkylineMaterials[0].material.opacity / (this.parisSkylineMaterials[0].opacity || 1) : 0)
+      : 0;
+    this.citySparks.forEach((s) => {
+      const fade = s.kind === 'dubai' ? dubaiFade : parisFade;
+      const twinkle = 0.75 + 0.55 * Math.pow(Math.max(0, Math.sin(now * s.speed + s.phase)), 1.4);
+      const flicker = 0.9 + 0.25 * Math.sin(now * (s.speed * 2.7) + s.phase * 1.3);
+      s.material.opacity = Math.min(1, s.base * fade * twinkle * flicker);
+    });
   }
 
   private buildSkylines() {
@@ -764,14 +837,14 @@ export class FlightWorld {
       map: moonTexture,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      transparent: false,
-      opacity: 1,
+      transparent: true,
+      opacity: 0,
       toneMapped: false,
       fog: false,
       color: 0xffffff,
     });
     const moon = new THREE.Sprite(moonMaterial);
-    moon.scale.set(26, 26, 1);
+    moon.scale.set(14, 14, 1);
     moon.visible = false;
     this.scene.add(moon);
     this.moonSprite = moon;
@@ -779,12 +852,12 @@ export class FlightWorld {
   }
 
   private buildParticles() {
-    const count = this.mobile ? 180 : 360;
+    const count = this.mobile ? 3500 : 9000;
     const positions = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
-      positions[i * 3] = -80 + Math.random() * 160;
-      positions[i * 3 + 1] = -2 + Math.random() * 42;
-      positions[i * 3 + 2] = -80 + Math.random() * 160;
+      positions[i * 3] = -160 + Math.random() * 320;
+      positions[i * 3 + 1] = -12 + Math.random() * 90;
+      positions[i * 3 + 2] = -180 + Math.random() * 360;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -1435,7 +1508,7 @@ export class FlightWorld {
     this.setSkylineFade('paris', 0);
     this.setSkylineFade('dubai', 1 - 0.78 * smoothstep(0.32, 1, u));
     if (this.sunSprite) (this.sunSprite.material as THREE.SpriteMaterial).opacity = 0.7;
-    if (this.moonSprite) { this.moonSprite.visible = false; (this.moonSprite.material as THREE.SpriteMaterial).opacity = 1; }
+    if (this.moonSprite) { this.moonSprite.visible = false; (this.moonSprite.material as THREE.SpriteMaterial).opacity = 0; }
 
     this.landingGear.visible = u < 0.84;
 
@@ -1522,13 +1595,13 @@ export class FlightWorld {
     this.setParisFade(smoothstep(0.74, 0.88, t));
     this.setSkylineFade('dubai', 0.22 * (1 - smoothstep(0, 0.12, t)));
     this.setSkylineFade('paris', smoothstep(0.74, 0.88, t));
-    const moonIn = smoothstep(0.74, 0.9, t);
+    const moonIn = smoothstep(0.68, 0.96, t);
     if (this.sunSprite) {
       (this.sunSprite.material as THREE.SpriteMaterial).opacity = 0.7 * (1 - 0.95 * moonIn);
     }
     if (this.moonSprite) {
-      this.moonSprite.visible = moonIn > 0.01;
-      (this.moonSprite.material as THREE.SpriteMaterial).opacity = 1;
+      this.moonSprite.visible = moonIn > 0.001;
+      (this.moonSprite.material as THREE.SpriteMaterial).opacity = moonIn;
     }
     this.landingGear.visible = t > 0.62;
     if (this.trail) this.trail.visible = !this.reduced && t < 0.86;
@@ -1639,6 +1712,7 @@ export class FlightWorld {
     });
     const blink = (performance.now() / 320) % 1 < 0.18 ? 2.6 : 0.08;
     this.navLights.forEach((m) => { m.emissiveIntensity = blink; });
+    this.updateCitySparks();
 
     this.render();
   }
