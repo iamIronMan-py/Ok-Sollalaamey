@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { createSkylineCanvas, SKYLINE_LAYERS, type SkylineKind } from './landmarks';
 
 type FlightWorldOptions = {
   mobile?: boolean;
@@ -134,6 +135,15 @@ export class FlightWorld {
   private readonly airportGroup = new THREE.Group();
   private readonly airportMaterials: Array<{ material: THREE.Material; opacity: number }> = [];
   private readonly loaderMaterials: Array<{ material: THREE.Material; opacity: number }> = [];
+  private readonly parisGroup = new THREE.Group();
+  private readonly parisMaterials: Array<{ material: THREE.Material; opacity: number }> = [];
+  private readonly parisSurfaceY = -3.4;
+  private readonly parisDir = new THREE.Vector3();
+  private readonly parisCenter = new THREE.Vector3();
+  private readonly dubaiSkyline = new THREE.Group();
+  private readonly parisSkyline = new THREE.Group();
+  private readonly dubaiSkylineMaterials: Array<{ material: THREE.MeshBasicMaterial; opacity: number }> = [];
+  private readonly parisSkylineMaterials: Array<{ material: THREE.MeshBasicMaterial; opacity: number }> = [];
   private readonly takeoffDir = new THREE.Vector3();
   private readonly takeoffStart = new THREE.Vector3();
   private readonly groundQuaternion = new THREE.Quaternion();
@@ -141,13 +151,16 @@ export class FlightWorld {
   private readonly cruisePlaneQuaternion = new THREE.Quaternion();
   private readonly cruiseCameraPosition = new THREE.Vector3();
   private readonly cruiseLookAt = new THREE.Vector3();
+  private readonly skylineView = new THREE.Vector3();
   private readonly groundY = -7.02;
   private cargoDoorPivot!: THREE.Group;
   private cargoBox!: THREE.Group;
   private cargoBoxHome = new THREE.Vector3();
   private cargoBoxTarget = new THREE.Vector3();
+  private cargoBoxUnload = new THREE.Vector3();
   private loaderGroup!: THREE.Group;
   private landingGear!: THREE.Group;
+  private sunSprite!: THREE.Sprite;
 
   constructor(canvas: HTMLCanvasElement, options: FlightWorldOptions = {}) {
     this.mobile = Boolean(options.mobile);
@@ -167,9 +180,9 @@ export class FlightWorld {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xd9b6ad, 42, 150);
+    this.scene.fog = new THREE.Fog(0xd9b6ad, 60, 1600);
 
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 700);
+    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 2600);
 
     this.pmrem = new THREE.PMREMGenerator(this.renderer);
     this.environment = this.pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
@@ -209,11 +222,14 @@ export class FlightWorld {
     this.buildPlane();
     this.buildAirport();
     this.buildLoader();
+    this.buildParisRunway();
+    this.buildSkylines();
 
     this.scene.add(this.plane);
     this.resize();
     this.setProgress(0);
     this.captureCruisePose();
+    (window as any).__flightWorld = this;
   }
 
   private captureCruisePose() {
@@ -254,18 +270,171 @@ export class FlightWorld {
     });
   }
 
-  private buildAirport() {
-    const groundMaterial = this.trackAirportMaterial(
-      new THREE.MeshStandardMaterial({ color: 0x3d2c38, roughness: 0.96, metalness: 0.02 }),
-    );
-    const groundGeometry = new THREE.PlaneGeometry(520, 520);
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(0, this.groundY - 0.12, -12);
-    ground.receiveShadow = true;
-    this.airportGroup.add(ground);
-    this.disposables.push(groundGeometry);
+  // Paris materials tracked here if/when runway geometry is added.
+  // (kept minimal to avoid unused-variable build errors)
 
+  private setParisFade(fade: number) {
+    const amount = clamp01(fade);
+    this.parisGroup.visible = amount > 0.008;
+    this.parisMaterials.forEach(({ material, opacity }) => {
+      material.opacity = opacity * amount;
+      material.depthWrite = amount > 0.55;
+    });
+  }
+
+  private buildSkyline(
+    kind: SkylineKind,
+    group: THREE.Group,
+    origin: THREE.Vector3,
+    outDir: THREE.Vector3,
+    list: Array<{ material: THREE.MeshBasicMaterial; opacity: number }>,
+    dynamic: boolean,
+  ) {
+    const specs = this.mobile
+      ? SKYLINE_LAYERS[kind].filter((spec) => spec.layer !== 'far')
+      : SKYLINE_LAYERS[kind];
+    const baseY = kind === 'dubai' ? this.groundY : this.parisSurfaceY;
+    const yaw = Math.atan2(-outDir.x, -outDir.z);
+
+    for (const spec of specs) {
+      const canvas = createSkylineCanvas(kind, spec.layer, this.mobile);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: spec.opacity,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+        side: THREE.DoubleSide,
+      });
+      const geometry = new THREE.PlaneGeometry(spec.worldWidth, spec.worldHeight);
+      const mesh = new THREE.Mesh(geometry, material);
+      if (dynamic) {
+        mesh.position.set(0, baseY + spec.worldHeight / 2 - 4, -spec.depth);
+      } else {
+        mesh.position.copy(origin).addScaledVector(outDir, spec.depth);
+        mesh.position.y = baseY + spec.worldHeight / 2 - 4;
+        mesh.rotation.y = yaw;
+      }
+      group.add(mesh);
+      list.push({ material, opacity: spec.opacity });
+      this.disposables.push(texture, geometry, material);
+    }
+  }
+
+  private placeSkylineAhead(kind: 'dubai', anchor: THREE.Vector3, dir: THREE.Vector3) {
+    const group = kind === 'dubai' ? this.dubaiSkyline : this.parisSkyline;
+    group.position.set(anchor.x, 0, anchor.z);
+    group.rotation.y = Math.atan2(-dir.x, -dir.z);
+  }
+
+  private setSkylineFade(kind: SkylineKind, fade: number) {
+    const amount = clamp01(fade);
+    const group = kind === 'dubai' ? this.dubaiSkyline : this.parisSkyline;
+    const list = kind === 'dubai' ? this.dubaiSkylineMaterials : this.parisSkylineMaterials;
+    group.visible = amount > 0.004;
+    for (const { material, opacity } of list) {
+      material.opacity = opacity * amount;
+    }
+  }
+
+  private buildSkylines() {
+    this.buildSkyline(
+      'dubai',
+      this.dubaiSkyline,
+      this.takeoffStart,
+      this.takeoffDir.clone().multiplyScalar(-1),
+      this.dubaiSkylineMaterials,
+      true,
+    );
+    this.buildSkyline(
+      'paris',
+      this.parisSkyline,
+      this.parisCenter,
+      this.parisDir,
+      this.parisSkylineMaterials,
+      false,
+    );
+    this.scene.add(this.dubaiSkyline, this.parisSkyline);
+    this.setSkylineFade('dubai', 0);
+    this.setSkylineFade('paris', 0);
+  }
+
+  private buildParisRunway() {
+    const end = this.curve.getPointAt(1);
+    const dir = this.curve.getTangentAt(1).setY(0).normalize();
+    const center = end.clone().addScaledVector(dir, 20);
+    this.parisDir.copy(dir);
+    this.parisCenter.copy(center);
+
+    const group = new THREE.Group();
+    group.position.set(center.x, this.parisSurfaceY, center.z);
+    group.rotation.y = Math.atan2(dir.x, dir.z);
+
+    const stripMaterial = this.trackParisMaterial(
+      new THREE.MeshStandardMaterial({ color: 0x1f242e, roughness: 0.86, metalness: 0.1 }),
+    );
+    const stripGeometry = new THREE.BoxGeometry(18, 0.14, 420);
+    const strip = new THREE.Mesh(stripGeometry, stripMaterial);
+    strip.position.y = 0.02;
+    strip.receiveShadow = true;
+    group.add(strip);
+    this.disposables.push(stripGeometry);
+
+    const shoulderMaterial = this.trackParisMaterial(
+      new THREE.MeshStandardMaterial({ color: 0x4a3945, roughness: 0.95 }),
+    );
+    for (const side of [-1, 1]) {
+      const shoulderGeometry = new THREE.BoxGeometry(1.6, 0.1, 420);
+      const shoulder = new THREE.Mesh(shoulderGeometry, shoulderMaterial);
+      shoulder.position.set(side * 9.8, 0.01, 0);
+      group.add(shoulder);
+      this.disposables.push(shoulderGeometry);
+    }
+
+    const dashMaterial = this.trackParisMaterial(
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.05, emissive: 0xffffff, emissiveIntensity: 0.35 }),
+    );
+    const dashGeometry = new THREE.BoxGeometry(0.7, 0.03, 8);
+    for (let z = -190; z <= 190; z += 16) {
+      const dash = new THREE.Mesh(dashGeometry, dashMaterial);
+      dash.position.set(0, 0.12, z);
+      group.add(dash);
+    }
+    this.disposables.push(dashGeometry);
+
+    const edgeLightMaterial = this.trackParisMaterial(
+      new THREE.MeshBasicMaterial({ color: 0xfff4c8 }),
+    );
+    const edgeLightGeometry = new THREE.SphereGeometry(0.18, 8, 8);
+    for (const side of [-1, 1]) {
+      for (let z = -200; z <= 200; z += 18) {
+        const light = new THREE.Mesh(edgeLightGeometry, edgeLightMaterial);
+        light.position.set(side * 10.6, 0.22, z);
+        group.add(light);
+      }
+    }
+    this.disposables.push(edgeLightGeometry);
+
+    this.parisGroup.add(group);
+    this.scene.add(this.parisGroup);
+    this.setParisFade(0);
+  }
+
+  private trackParisMaterial<T extends THREE.Material>(material: T): T {
+    material.transparent = true;
+    this.parisMaterials.push({ material, opacity: (material as any).opacity ?? 1 });
+    this.disposables.push(material);
+    return material;
+  }
+
+  private buildAirport() {
     const runway = new THREE.Group();
     const runwayCenter = this.takeoffStart.clone().addScaledVector(this.takeoffDir, 30);
     runway.position.set(runwayCenter.x, this.groundY, runwayCenter.z);
@@ -293,47 +462,28 @@ export class FlightWorld {
     }
 
     const dashMaterial = this.trackAirportMaterial(
-      new THREE.MeshBasicMaterial({ color: 0xe8d8c5 }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.05, emissive: 0xffffff, emissiveIntensity: 0.35 }),
     );
-    const dashGeometry = new THREE.BoxGeometry(0.32, 0.025, 4.8);
-    const dashCount = 22;
-    const dashes = new THREE.InstancedMesh(dashGeometry, dashMaterial, dashCount);
-    const matrix = new THREE.Matrix4();
-    for (let i = 0; i < dashCount; i += 1) {
-      matrix.makeTranslation(0, 0.13, -84 + i * 8);
-      dashes.setMatrixAt(i, matrix);
+    const dashGeometry = new THREE.BoxGeometry(0.7, 0.03, 8);
+    for (let z = -80; z <= 80; z += 16) {
+      const dash = new THREE.Mesh(dashGeometry, dashMaterial);
+      dash.position.set(0, 0.13, z);
+      runway.add(dash);
     }
-    dashes.instanceMatrix.needsUpdate = true;
-    runway.add(dashes);
     this.disposables.push(dashGeometry);
 
-    const lightMaterial = this.trackAirportMaterial(
-      new THREE.MeshBasicMaterial({ color: 0xffd8a1 }),
+    const edgeLightMaterial = this.trackAirportMaterial(
+      new THREE.MeshBasicMaterial({ color: 0xfff4c8 }),
     );
-    const lightGeometry = new THREE.SphereGeometry(0.1, 6, 6);
-    const lightRows = 22;
-    const edgeLights = new THREE.InstancedMesh(lightGeometry, lightMaterial, lightRows * 2);
-    let lightIndex = 0;
+    const edgeLightGeometry = new THREE.SphereGeometry(0.18, 8, 8);
     for (const side of [-1, 1]) {
-      for (let i = 0; i < lightRows; i += 1) {
-        matrix.makeTranslation(side * 10.6, 0.2, -84 + i * 8);
-        edgeLights.setMatrixAt(lightIndex, matrix);
-        lightIndex += 1;
+      for (let z = -88; z <= 88; z += 16) {
+        const light = new THREE.Mesh(edgeLightGeometry, edgeLightMaterial);
+        light.position.set(side * 10.8, 0.22, z);
+        runway.add(light);
       }
     }
-    edgeLights.instanceMatrix.needsUpdate = true;
-    runway.add(edgeLights);
-    this.disposables.push(lightGeometry);
-
-    const apronMaterial = this.trackAirportMaterial(
-      new THREE.MeshStandardMaterial({ color: 0x4a3743, roughness: 0.92 }),
-    );
-    const apronGeometry = new THREE.BoxGeometry(58, 0.08, 68);
-    const apron = new THREE.Mesh(apronGeometry, apronMaterial);
-    apron.position.set(31, 0.01, -32);
-    apron.receiveShadow = true;
-    runway.add(apron);
-    this.disposables.push(apronGeometry);
+    this.disposables.push(edgeLightGeometry);
 
     const terminalMaterial = this.trackAirportMaterial(
       new THREE.MeshStandardMaterial({ color: 0x6e5360, roughness: 0.7, metalness: 0.15 }),
@@ -469,16 +619,7 @@ export class FlightWorld {
     fill.position.set(-6, -14, 18);
     this.scene.add(fill);
 
-    const shadowPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(220, 220),
-      new THREE.ShadowMaterial({ opacity: 0.16 }),
-    );
-    shadowPlane.rotation.x = -Math.PI / 2;
-    shadowPlane.position.y = -7.1;
-    shadowPlane.receiveShadow = true;
-    shadowPlane.renderOrder = -1;
-    this.scene.add(shadowPlane);
-    this.disposables.push(shadowPlane.geometry, shadowPlane.material as THREE.Material);
+
   }
 
   private buildCloudSea(y: number, opacity: number, repeat: number, speed: number) {
@@ -519,27 +660,58 @@ export class FlightWorld {
       fog: false,
     });
     const sun = new THREE.Sprite(material);
-    sun.position.set(78, 18, -140);
-    sun.scale.set(42, 42, 1);
+    sun.position.set(120, 46, -180);
+    sun.scale.set(36, 36, 1);
     this.scene.add(sun);
+    this.sunSprite = sun;
     this.disposables.push(material);
   }
 
   private buildParticles() {
-    const count = this.mobile ? 120 : 260;
+    const count = this.mobile ? 180 : 360;
     const positions = new Float32Array(count * 3);
     for (let i = 0; i < count; i += 1) {
-      positions[i * 3] = -45 + Math.random() * 90;
-      positions[i * 3 + 1] = -2 + Math.random() * 24;
-      positions[i * 3 + 2] = -45 + Math.random() * 90;
+      positions[i * 3] = -80 + Math.random() * 160;
+      positions[i * 3 + 1] = -2 + Math.random() * 42;
+      positions[i * 3 + 2] = -80 + Math.random() * 160;
     }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, 64, 64);
+      ctx.translate(32, 32);
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 28);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.35, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      const outer = 22;
+      const inner = 9;
+      for (let i = 0; i < 10; i += 1) {
+        const r = i % 2 === 0 ? outer : inner;
+        const a = (i * Math.PI) / 5 - Math.PI / 2;
+        ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    this.cloudTextures.push(texture);
+
     const material = new THREE.PointsMaterial({
-      color: 0xffe6c4,
-      size: 0.16,
+      color: 0xfff3f8,
+      map: texture,
+      size: 0.24,
       transparent: true,
       opacity: 0.75,
+      alphaTest: 0.02,
       depthWrite: false,
       sizeAttenuation: true,
       blending: THREE.AdditiveBlending,
@@ -777,13 +949,44 @@ export class FlightWorld {
     this.plane.add(windows);
     this.disposables.push(windowGeometry, windowMaterial);
 
-    // Gold livery stripe.
-    for (const side of [-1, 1]) {
-      const stripeGeometry = new THREE.BoxGeometry(0.018, 0.045, 2.35);
-      const stripe = new THREE.Mesh(stripeGeometry, gold);
-      stripe.position.set(side * 0.44, -0.03, -0.05);
-      this.plane.add(stripe);
-      this.disposables.push(stripeGeometry);
+    // Fuselage name: "Love Airlines".
+    const nameCanvas = document.createElement('canvas');
+    nameCanvas.width = 1024;
+    nameCanvas.height = 256;
+    const nameCtx = nameCanvas.getContext('2d');
+    if (nameCtx) {
+      nameCtx.clearRect(0, 0, nameCanvas.width, nameCanvas.height);
+      nameCtx.font = 'italic 700 118px "Georgia", "Times New Roman", serif';
+      nameCtx.textAlign = 'center';
+      nameCtx.textBaseline = 'middle';
+      nameCtx.lineJoin = 'round';
+      nameCtx.strokeStyle = '#d4af37';
+      nameCtx.lineWidth = 7;
+      nameCtx.strokeText('Love Airlines', nameCanvas.width / 2, nameCanvas.height / 2 + 6);
+      nameCtx.fillStyle = '#ff1028';
+      nameCtx.fillText('Love Airlines', nameCanvas.width / 2, nameCanvas.height / 2 + 6);
+      nameCtx.strokeStyle = 'rgba(120, 20, 20, 0.35)';
+      nameCtx.lineWidth = 1.5;
+      nameCtx.strokeText('Love Airlines', nameCanvas.width / 2, nameCanvas.height / 2 + 6);
+      const nameTexture = new THREE.CanvasTexture(nameCanvas);
+      nameTexture.colorSpace = THREE.SRGBColorSpace;
+      nameTexture.needsUpdate = true;
+      const nameMaterial = new THREE.MeshBasicMaterial({
+        map: nameTexture,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        side: THREE.FrontSide,
+      });
+      const nameGeometry = new THREE.PlaneGeometry(1.35, 0.34);
+      for (const side of [-1, 1] as const) {
+        const namePlate = new THREE.Mesh(nameGeometry, nameMaterial);
+        namePlate.position.set(side * 0.5, 0.24, 0.15);
+        namePlate.rotation.y = side * Math.PI / 2;
+        namePlate.renderOrder = 10;
+        this.plane.add(namePlate);
+      }
+      this.disposables.push(nameTexture, nameMaterial, nameGeometry);
     }
 
     // Gold spine along the top of the fuselage.
@@ -812,9 +1015,61 @@ export class FlightWorld {
     wingGeometry.translate(0, 0.045, 0);
     this.disposables.push(wingGeometry);
 
+    const roseMaterial = new THREE.MeshStandardMaterial({
+      color: 0xd62839,
+      emissive: 0x4a0b16,
+      emissiveIntensity: 0.18,
+      roughness: 0.55,
+      metalness: 0.05,
+    });
+    const petalMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff7a8c,
+      emissive: 0x5a1020,
+      emissiveIntensity: 0.12,
+      roughness: 0.6,
+      metalness: 0.02,
+    });
+    const roseCenterMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe7c98f,
+      emissive: 0x3a2a10,
+      emissiveIntensity: 0.08,
+      roughness: 0.5,
+      metalness: 0.1,
+    });
+    this.disposables.push(roseMaterial, petalMaterial, roseCenterMaterial);
+
+    const makeWingRose = () => {
+      const group = new THREE.Group();
+      const center = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 10), roseCenterMaterial);
+      group.add(center);
+      for (let i = 0; i < 6; i += 1) {
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 10), i % 2 ? petalMaterial : roseMaterial);
+        petal.scale.set(1.05, 0.55, 1.25);
+        const a = (i / 6) * Math.PI * 2;
+        petal.position.set(Math.cos(a) * 0.1, 0.0, Math.sin(a) * 0.1);
+        petal.rotation.y = a;
+        petal.rotation.z = 0.15;
+        group.add(petal);
+      }
+      for (let i = 0; i < 4; i += 1) {
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 10), i % 2 ? roseMaterial : petalMaterial);
+        petal.scale.set(0.95, 0.5, 1.1);
+        const a = (i / 4) * Math.PI * 2 + 0.4;
+        petal.position.set(Math.cos(a) * 0.045, 0.035, Math.sin(a) * 0.045);
+        petal.rotation.y = a;
+        group.add(petal);
+      }
+      return group;
+    };
+
     const rightWing = new THREE.Mesh(wingGeometry, pearl);
     rightWing.rotation.z = 0.07;
     rightWing.castShadow = true;
+    const rightRose = makeWingRose();
+    rightRose.position.set(1.55, 0.105, -0.1);
+    rightRose.scale.setScalar(0.9);
+    rightRose.rotation.x = -Math.PI / 2;
+    rightWing.add(rightRose);
     this.plane.add(rightWing);
 
     const leftWingGeometry = wingGeometry.clone();
@@ -822,6 +1077,11 @@ export class FlightWorld {
     const leftWing = new THREE.Mesh(leftWingGeometry, pearl);
     leftWing.rotation.z = -0.07;
     leftWing.castShadow = true;
+    const leftRose = makeWingRose();
+    leftRose.position.set(-1.55, 0.105, -0.1);
+    leftRose.scale.setScalar(0.9);
+    leftRose.rotation.x = -Math.PI / 2;
+    leftWing.add(leftRose);
     this.plane.add(leftWing);
     this.disposables.push(leftWingGeometry);
 
@@ -964,6 +1224,7 @@ export class FlightWorld {
     this.cargoBox.add(bandA, bandB);
     this.cargoBoxHome.set(1.22, 0.12, 0.72);
     this.cargoBoxTarget.set(0.3, 0.02, 0.72);
+    this.cargoBoxUnload.set(1.46, -0.54, 0.72);
     this.cargoBox.position.copy(this.cargoBoxHome);
     this.plane.add(this.cargoBox);
     this.disposables.push(boxGeometry, cargoMaterial, ribbonMaterial);
@@ -1038,6 +1299,9 @@ export class FlightWorld {
 
     const airportFade = 1 - smoothstep(0.46, 0.88, u);
     this.setAirportFade(airportFade);
+    this.setSkylineFade('paris', 0);
+    this.setSkylineFade('dubai', 1 - 0.78 * smoothstep(0.32, 1, u));
+    if (this.sunSprite) (this.sunSprite.material as THREE.SpriteMaterial).opacity = 0.7;
 
     this.landingGear.visible = u < 0.84;
 
@@ -1052,7 +1316,7 @@ export class FlightWorld {
     const loadTarget = this.takeoffStart
       .clone()
       .addScaledVector(right, 0.2)
-      .add(new THREE.Vector3(0, 0.12, 0))
+      .add(new THREE.Vector3(0, 0.68, 0))
       .addScaledVector(forward, 0.55 + smoothstep(0, 0.35, u) * 0.4);
 
     const chaseCamera = position
@@ -1063,7 +1327,7 @@ export class FlightWorld {
     const chaseTarget = position
       .clone()
       .addScaledVector(forward, 4)
-      .add(new THREE.Vector3(0, 1.0, 0));
+      .add(new THREE.Vector3(0, 1.35, 0));
 
     const follow = smoothstep(0.3, 0.66, u);
     const handover = smoothstep(0.7, 1, u);
@@ -1074,6 +1338,8 @@ export class FlightWorld {
 
     this.camera.position.copy(cameraPosition);
     this.camera.lookAt(lookTarget);
+    this.camera.getWorldDirection(this.skylineView);
+    this.placeSkylineAhead('dubai', this.plane.position, this.skylineView);
 
     const nearMap = (this.cloudNear.material as THREE.MeshBasicMaterial).map;
     const farMap = (this.cloudFar.material as THREE.MeshBasicMaterial).map;
@@ -1094,10 +1360,34 @@ export class FlightWorld {
     this.progress = t;
     this.setAirportFade(0);
     this.setLoaderFade(0);
-    this.cargoDoorPivot.rotation.z = 0;
-    this.cargoBox.visible = false;
-    this.landingGear.visible = false;
-    if (this.trail) this.trail.visible = !this.reduced;
+
+    const touchdownAt = 0.84;
+    const roll = smoothstep(touchdownAt, 1, t);
+    const landBlend = smoothstep(0.68, touchdownAt, t);
+    const unload = smoothstep(0.9, 0.995, t);
+    const rollDistance = roll * 58;
+
+    if (t < 0.86) {
+      this.cargoDoorPivot.rotation.z = 0;
+      this.cargoBox.visible = false;
+      this.cargoBox.position.copy(this.cargoBoxTarget);
+      this.cargoBox.rotation.y = 0;
+    } else {
+      this.cargoDoorPivot.rotation.z = unload * 1.12;
+      this.cargoBox.visible = true;
+      this.cargoBox.position.lerpVectors(this.cargoBoxTarget, this.cargoBoxUnload, unload);
+      this.cargoBox.rotation.y = unload * 0.22;
+    }
+
+    this.setParisFade(smoothstep(0.74, 0.88, t));
+    this.setSkylineFade('dubai', 0.22 * (1 - smoothstep(0, 0.12, t)));
+    this.setSkylineFade('paris', smoothstep(0.74, 0.88, t));
+    if (this.sunSprite) {
+      (this.sunSprite.material as THREE.SpriteMaterial).opacity =
+        0.7 * (1 - 0.92 * smoothstep(0.76, 0.9, t));
+    }
+    this.landingGear.visible = t > 0.62;
+    if (this.trail) this.trail.visible = !this.reduced && t < 0.86;
     if (this.exhaust) {
       this.exhaust.visible = false;
       (this.exhaust.material as THREE.PointsMaterial).opacity = 0;
@@ -1106,14 +1396,28 @@ export class FlightWorld {
     const point = this.curve.getPointAt(t);
     const tangent = this.curve.getTangentAt(t).normalize();
     const nextTangent = this.curve.getTangentAt(Math.min(1, t + 0.012)).normalize();
+    const flat = tangent.clone().setY(0).normalize();
+    const runwayFlat = this.parisDir.lengthSq() > 0 ? this.parisDir.clone() : flat;
 
-    const bob = Math.sin(t * Math.PI * 6.2) * 0.09;
-    this.plane.position.set(point.x, point.y + bob, point.z);
+    const bob = Math.sin(t * Math.PI * 6.2) * 0.09 * (1 - landBlend);
+    const touchdownY = this.parisSurfaceY + 0.672;
+    this.plane.position.set(
+      point.x + runwayFlat.x * rollDistance,
+      point.y + (touchdownY - point.y) * landBlend + bob,
+      point.z + runwayFlat.z * rollDistance,
+    );
     this.plane.up.set(0, 1, 0);
-    this.plane.lookAt(point.clone().add(tangent));
+    const lookDir = tangent
+      .clone()
+      .lerp(runwayFlat, smoothstep(0.7, 0.9, t))
+      .normalize();
+    this.plane.lookAt(this.plane.position.clone().add(lookDir));
+
+    const flare = smoothstep(0.82, 0.9, t) * (1 - smoothstep(0.9, 0.98, t));
+    this.plane.rotateX(-0.045 * flare);
 
     const turn = new THREE.Vector3().crossVectors(tangent, nextTangent);
-    const bank = THREE.MathUtils.clamp(-turn.y * 26, -0.62, 0.62);
+    const bank = THREE.MathUtils.clamp(-turn.y * 26, -0.62, 0.62) * (1 - landBlend);
     this.plane.rotateZ(bank);
 
     const up = new THREE.Vector3(0, 1, 0);
@@ -1122,18 +1426,50 @@ export class FlightWorld {
     const distance = 20.5 - Math.sin(t * Math.PI) * 6.5;
     const behind = Math.cos(orbit) * distance;
     const side = Math.sin(orbit) * distance;
-    const height = 5.8 + Math.sin(t * Math.PI) * 1.6 + Math.cos(t * Math.PI * 2) * 0.5;
+    const height = 5.8 + Math.sin(t * Math.PI) * 1.6 + Math.cos(t * Math.PI * 2) * 0.5 - landBlend * 2.6;
 
-    const cameraPosition = point
+    const orbitCamPos = this.plane.position
       .clone()
       .add(tangent.clone().multiplyScalar(-behind))
       .add(right.clone().multiplyScalar(side))
       .add(new THREE.Vector3(0, height, 0));
+    const orbitLook = this.plane.position
+      .clone()
+      .add(lookDir.clone().multiplyScalar(3.4))
+      .add(new THREE.Vector3(0, 0.9, 0));
+
+    const chaseIn = smoothstep(0.76, 0.9, t);
+    const chaseCamPos = this.plane.position
+      .clone()
+      .addScaledVector(runwayFlat, -22)
+      .add(new THREE.Vector3(0, 6.4, 0));
+    const chaseLook = this.plane.position
+      .clone()
+      .addScaledVector(runwayFlat, 32)
+      .add(new THREE.Vector3(0, 3.0, 0));
+
+    const cameraPosition = orbitCamPos.lerp(chaseCamPos, chaseIn);
+    const look = orbitLook.lerp(chaseLook, chaseIn);
 
     this.camera.position.copy(cameraPosition);
-    const look = point.clone().add(tangent.clone().multiplyScalar(3.4)).add(new THREE.Vector3(0, 0.9, 0));
     this.camera.lookAt(look);
     this.cruiseLookAt.copy(look);
+    if (this.sunSprite) {
+      const parisBlend = smoothstep(0.7, 0.9, t);
+      const viewDir = look.clone().sub(cameraPosition).setY(0).normalize();
+      const camRight = new THREE.Vector3().crossVectors(viewDir, new THREE.Vector3(0, 1, 0)).normalize();
+      const cruiseSun = new THREE.Vector3(120, 46, -180);
+      const parisSun = cameraPosition
+        .clone()
+        .add(viewDir.multiplyScalar(220))
+        .add(camRight.multiplyScalar(95))
+        .add(new THREE.Vector3(0, 70, 0));
+      this.sunSprite.position.copy(cruiseSun.lerp(parisSun, parisBlend));
+    }
+    if (t < 0.13) {
+      this.camera.getWorldDirection(this.skylineView);
+      this.placeSkylineAhead('dubai', this.plane.position, this.skylineView);
+    }
 
     this.updateTrail(t);
 

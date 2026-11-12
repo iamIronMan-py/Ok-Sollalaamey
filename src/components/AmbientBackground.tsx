@@ -139,18 +139,7 @@ export function AmbientBackground() {
         />
       ))}
 
-      {sparkles.map((sparkle, i) => (
-        <span
-          key={`sparkle-${i}`}
-          className="ambient__sparkle"
-          style={{
-            left: `${sparkle.left}%`,
-            top: `${sparkle.top}%`,
-            width: sparkle.size,
-            height: sparkle.size,
-          }}
-        />
-      ))}
+      {null}
 
       <div className="ambient__grain" />
     </div>

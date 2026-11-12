@@ -148,7 +148,7 @@ function Sparkle({ x, y, r }: { x: number; y: number; r: number }) {
   return (
     <path
       className="box__sparkle"
-      d={`M ${x} ${y - r} C ${x + r * 0.22} ${y - r * 0.22} ${x + r * 0.22} ${y - r * 0.22} ${x + r} ${y} C ${x + r * 0.22} ${y + r * 0.22} ${x + r * 0.22} ${y + r * 0.22} ${x} ${y + r} C ${x - r * 0.22} ${y + r * 0.22} ${x - r * 0.22} ${y + r * 0.22} ${x - r} ${y} C ${x - r * 0.22} ${y - r * 0.22} ${x - r * 0.22} ${y - r * 0.22} ${x} ${y - r} Z`}
+      d={`M ${x} ${y - r} L ${x + r * 0.38} ${y - r * 0.38} L ${x + r} ${y} L ${x + r * 0.38} ${y + r * 0.38} L ${x} ${y + r} L ${x - r * 0.38} ${y + r * 0.38} L ${x - r} ${y} L ${x - r * 0.38} ${y - r * 0.38} Z`}
       opacity={0.85}
     />
   );
