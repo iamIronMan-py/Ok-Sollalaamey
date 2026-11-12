@@ -17,7 +17,7 @@ export const GiftBox3D = forwardRef<HTMLDivElement, Props>(function GiftBox3D({ 
     const contents = root.querySelector('[data-box-contents]') as HTMLElement | null;
     const glow = root.querySelector('[data-box-glow]') as HTMLElement | null;
     const float = root.querySelector('[data-box-float]') as HTMLElement | null;
-    if (lid) lid.style.transform = `translateZ(0px) rotateX(${t * 125}deg) translateY(${-t * 2}px)`;
+    if (lid) lid.style.transform = `translateZ(0px) rotateX(${t * -125}deg) translateY(${-t * 2}px)`;
     if (contents) {
       contents.style.opacity = String(t);
       contents.style.transform = `translateX(-50%) translateY(${4 - t * 26}%) scale(${0.9 + t * 0.14})`;

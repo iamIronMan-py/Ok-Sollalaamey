@@ -161,6 +161,9 @@ export class FlightWorld {
   private loaderGroup!: THREE.Group;
   private landingGear!: THREE.Group;
   private sunSprite!: THREE.Sprite;
+  private moonSprite!: THREE.Sprite;
+  private engineFans: THREE.Mesh[] = [];
+  private navLights: THREE.MeshStandardMaterial[] = [];
 
   constructor(canvas: HTMLCanvasElement, options: FlightWorldOptions = {}) {
     this.mobile = Boolean(options.mobile);
@@ -665,6 +668,114 @@ export class FlightWorld {
     this.scene.add(sun);
     this.sunSprite = sun;
     this.disposables.push(material);
+
+    const moonCanvas = document.createElement('canvas');
+    moonCanvas.width = 512;
+    moonCanvas.height = 512;
+    const ctx = moonCanvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, 512, 512);
+      const glow = ctx.createRadialGradient(256, 256, 20, 256, 256, 250);
+      glow.addColorStop(0, 'rgba(255,255,255,1)');
+      glow.addColorStop(0.18, 'rgba(255,255,255,1)');
+      glow.addColorStop(0.38, 'rgba(235,255,255,1)');
+      glow.addColorStop(0.6, 'rgba(210,250,255,0.98)');
+      glow.addColorStop(0.82, 'rgba(180,245,255,0.95)');
+      glow.addColorStop(1, 'rgba(140,230,255,0.9)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(256, 256, 230, 0, Math.PI * 2);
+      ctx.fill();
+
+      const core = ctx.createRadialGradient(230, 220, 10, 256, 256, 120);
+      core.addColorStop(0, 'rgba(255,255,255,1)');
+      core.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+      core.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.arc(256, 256, 180, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      ctx.strokeStyle = 'rgba(140,250,255,0.95)';
+      ctx.lineWidth = 2.5;
+      for (let r = 50; r <= 210; r += 32) {
+        ctx.beginPath();
+        ctx.arc(256, 256, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(30, 256); ctx.lineTo(482, 256);
+      ctx.moveTo(256, 30); ctx.lineTo(256, 482);
+      ctx.moveTo(90, 90); ctx.lineTo(422, 422);
+      ctx.moveTo(422, 90); ctx.lineTo(90, 422);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      for (let y = 30; y < 482; y += 8) {
+        ctx.fillStyle = y % 16 === 0 ? 'rgba(170,255,255,0.55)' : 'rgba(255,255,255,0.16)';
+        ctx.fillRect(30, y, 452, 2.5);
+      }
+      ctx.restore();
+
+      const sparks = [
+        [120, 120, 10], [380, 140, 8], [150, 360, 9], [360, 360, 11], [256, 90, 7], [256, 420, 8],
+        [90, 256, 7], [420, 256, 9], [180, 200, 6], [330, 210, 7], [210, 320, 8], [320, 320, 6],
+      ];
+      sparks.forEach(([x, y, s], i) => {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((i * Math.PI) / 8);
+        ctx.fillStyle = 'rgba(255,255,255,0.98)';
+        ctx.shadowColor = 'rgba(180,255,255,1)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        for (let p = 0; p < 8; p += 1) {
+          const a = (p * Math.PI) / 4;
+          const r = p % 2 === 0 ? s : s * 0.4;
+          ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      ctx.save();
+      ctx.globalAlpha = 0.38;
+      ctx.strokeStyle = 'rgba(255,255,255,0.98)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(256, 256, 236, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(150,250,255,0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(256, 256, 220, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    const moonTexture = new THREE.CanvasTexture(moonCanvas);
+    moonTexture.colorSpace = THREE.SRGBColorSpace;
+    this.cloudTextures.push(moonTexture);
+    const moonMaterial = new THREE.SpriteMaterial({
+      map: moonTexture,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      transparent: false,
+      opacity: 1,
+      toneMapped: false,
+      fog: false,
+      color: 0xffffff,
+    });
+    const moon = new THREE.Sprite(moonMaterial);
+    moon.scale.set(26, 26, 1);
+    moon.visible = false;
+    this.scene.add(moon);
+    this.moonSprite = moon;
+    this.disposables.push(moonMaterial);
   }
 
   private buildParticles() {
@@ -1095,6 +1206,27 @@ export class FlightWorld {
       this.disposables.push(wingletGeometry);
     }
 
+    // Navigation lights: red (left) and green (right).
+    for (const spec of [
+      { side: -1, color: 0xff2b2b, emissive: 0xff1010 },
+      { side: 1, color: 0x31ff5a, emissive: 0x12ff3a },
+    ] as const) {
+      const lightGeometry = new THREE.SphereGeometry(0.05, 14, 14);
+      const lightMaterial = new THREE.MeshStandardMaterial({
+        color: spec.color,
+        emissive: spec.emissive,
+        emissiveIntensity: 2.2,
+        roughness: 0.25,
+        metalness: 0.1,
+        toneMapped: false,
+      });
+      const light = new THREE.Mesh(lightGeometry, lightMaterial);
+      light.position.set(spec.side * 3.02, 0.18, -0.58);
+      this.plane.add(light);
+      this.navLights.push(lightMaterial);
+      this.disposables.push(lightGeometry, lightMaterial);
+    }
+
     // Engines.
     for (const side of [-1, 1]) {
       const nacelleGeometry = new THREE.CylinderGeometry(0.2, 0.235, 0.86, 24, 1, true);
@@ -1115,6 +1247,7 @@ export class FlightWorld {
       const fan = new THREE.Mesh(fanGeometry, engineDark);
       fan.position.set(side * 1.18, -0.2, 0.445);
       this.plane.add(fan);
+      this.engineFans.push(fan);
       this.disposables.push(fanGeometry);
 
       const pylonGeometry = new THREE.BoxGeometry(0.09, 0.22, 0.52);
@@ -1302,6 +1435,7 @@ export class FlightWorld {
     this.setSkylineFade('paris', 0);
     this.setSkylineFade('dubai', 1 - 0.78 * smoothstep(0.32, 1, u));
     if (this.sunSprite) (this.sunSprite.material as THREE.SpriteMaterial).opacity = 0.7;
+    if (this.moonSprite) { this.moonSprite.visible = false; (this.moonSprite.material as THREE.SpriteMaterial).opacity = 1; }
 
     this.landingGear.visible = u < 0.84;
 
@@ -1350,6 +1484,12 @@ export class FlightWorld {
     const throttle = smoothstep(0.06, 0.24, u) * 0.45 + smoothstep(0.24, 0.72, u) * 0.35 + smoothstep(0.72, 1, u) * 0.5;
     const backDir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.plane.quaternion).normalize();
     if (this.exhaust) this.updateExhaust(throttle, backDir, 0.05 + throttle * 0.06);
+    const fanSpin = performance.now() * 0.001 * (1.5 + throttle * 22);
+    this.engineFans.forEach((fan) => {
+      fan.rotation.z = fanSpin;
+    });
+    const blink = (performance.now() / 320) % 1 < 0.18 ? 2.6 : 0.08;
+    this.navLights.forEach((m) => { m.emissiveIntensity = blink; });
 
     this.render();
   }
@@ -1382,9 +1522,13 @@ export class FlightWorld {
     this.setParisFade(smoothstep(0.74, 0.88, t));
     this.setSkylineFade('dubai', 0.22 * (1 - smoothstep(0, 0.12, t)));
     this.setSkylineFade('paris', smoothstep(0.74, 0.88, t));
+    const moonIn = smoothstep(0.74, 0.9, t);
     if (this.sunSprite) {
-      (this.sunSprite.material as THREE.SpriteMaterial).opacity =
-        0.7 * (1 - 0.92 * smoothstep(0.76, 0.9, t));
+      (this.sunSprite.material as THREE.SpriteMaterial).opacity = 0.7 * (1 - 0.95 * moonIn);
+    }
+    if (this.moonSprite) {
+      this.moonSprite.visible = moonIn > 0.01;
+      (this.moonSprite.material as THREE.SpriteMaterial).opacity = 1;
     }
     this.landingGear.visible = t > 0.62;
     if (this.trail) this.trail.visible = !this.reduced && t < 0.86;
@@ -1466,6 +1610,16 @@ export class FlightWorld {
         .add(new THREE.Vector3(0, 70, 0));
       this.sunSprite.position.copy(cruiseSun.lerp(parisSun, parisBlend));
     }
+    if (this.moonSprite) {
+      const viewDirM = look.clone().sub(cameraPosition).normalize();
+      const camRightM = new THREE.Vector3().crossVectors(viewDirM, this.camera.up).normalize();
+      const camUpM = new THREE.Vector3().crossVectors(camRightM, viewDirM).normalize();
+      this.moonSprite.position
+        .copy(cameraPosition)
+        .addScaledVector(viewDirM, 120)
+        .addScaledVector(camRightM, 38)
+        .addScaledVector(camUpM, 28);
+    }
     if (t < 0.13) {
       this.camera.getWorldDirection(this.skylineView);
       this.placeSkylineAhead('dubai', this.plane.position, this.skylineView);
@@ -1477,6 +1631,14 @@ export class FlightWorld {
     const farMap = (this.cloudFar.material as THREE.MeshBasicMaterial).map;
     if (nearMap) nearMap.offset.x = this.progress * (this.cloudNear.userData.speed as number);
     if (farMap) farMap.offset.x = this.progress * (this.cloudFar.userData.speed as number);
+
+    const fanSpeed = t < 0.86 ? 22 : 22 * (1 - smoothstep(0.86, 1, t)) + 1.2;
+    const fanSpin = performance.now() * 0.001 * fanSpeed;
+    this.engineFans.forEach((fan) => {
+      fan.rotation.z = fanSpin;
+    });
+    const blink = (performance.now() / 320) % 1 < 0.18 ? 2.6 : 0.08;
+    this.navLights.forEach((m) => { m.emissiveIntensity = blink; });
 
     this.render();
   }

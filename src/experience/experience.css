@@ -253,7 +253,7 @@ body {
 }
 
 .finale-friends__bouquet {
-  width: 60%;
+  width: 75%;
   height: auto;
   transform: rotate(-5deg);
 }
@@ -500,7 +500,7 @@ body {
   inset: 0;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  backface-visibility: hidden;
+  backface-visibility: visible;
 }
 
 .box3d__face--front {
@@ -601,8 +601,8 @@ body {
 .box3d__contents {
   position: absolute;
   left: 50%;
-  bottom: 34%;
-  width: calc(var(--box) * 1.42);
+  bottom: 30%;
+  width: calc(var(--box) * 1.75);
   height: auto;
   opacity: 0;
   transform: translateX(-50%) translateY(4%) scale(0.9);
@@ -2037,22 +2037,85 @@ html.is-cinema body {
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.3);
 }
 
-/* puppy door: colorful home, only door visible */
+/* puppy door: colorful home filled with bubbling hearts */
 .cutscene[data-scene='door'] .cutscene__veil {
   background:
-    radial-gradient(80% 60% at 15% 20%, rgba(255, 236, 196, 0.98) 0%, transparent 50%),
-    radial-gradient(70% 55% at 85% 25%, rgba(255, 206, 224, 0.92) 0%, transparent 50%),
-    radial-gradient(90% 70% at 50% 95%, rgba(210, 232, 214, 0.9) 0%, transparent 55%),
-    linear-gradient(180deg, #fff9f0 0%, #fef0e8 35%, #f6e5f0 65%, #ece9fb 100%) !important;
+    radial-gradient(70% 55% at 18% 18%, rgba(255, 170, 200, 0.55) 0%, transparent 55%),
+    radial-gradient(60% 50% at 82% 22%, rgba(255, 214, 180, 0.45) 0%, transparent 55%),
+    radial-gradient(90% 70% at 50% 95%, rgba(180, 140, 210, 0.45) 0%, transparent 55%),
+    linear-gradient(180deg, #2a1630 0%, #3b1f3a 30%, #4a2740 55%, #2e2348 100%) !important;
 }
 .doorway__wall { display: none !important; }
 .cutscene[data-scene='door'] .doorway__frame {
   background: linear-gradient(180deg, #fffdf8 0%, #f8ead8 100%);
-  box-shadow: 0 0 0 12px rgba(255,248,242,0.85), 0 30px 60px rgba(120,70,90,0.15);
+  box-shadow: 0 0 0 12px rgba(255,248,242,0.85), 0 30px 60px rgba(120,70,90,0.25);
+  z-index: 2;
+}
+.doorway__bubbles {
+  position: absolute;
+  inset: -10% -6%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.doorway__bubble {
+  position: absolute;
+  transform: rotate(45deg);
+  border-radius: 4px;
+  animation: heartBubble linear infinite;
+  filter: drop-shadow(0 4px 10px rgba(255,120,160,0.35));
+  will-change: transform, opacity;
+}
+.doorway__bubble::before,
+.doorway__bubble::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+}
+.doorway__bubble::before { left: -50%; top: 0; }
+.doorway__bubble::after { left: 0; top: -50%; }
+@keyframes heartBubble {
+  0% { transform: translate3d(0, 0, 0) rotate(45deg) scale(0.6); opacity: 0; }
+  10% { opacity: 0.85; }
+  50% { transform: translate3d(var(--drift, 20px), -40vh, 0) rotate(45deg) scale(1); opacity: 0.9; }
+  90% { opacity: 0.5; }
+  100% { transform: translate3d(calc(var(--drift, 20px) * -0.6), -95vh, 0) rotate(45deg) scale(0.75); opacity: 0; }
 }
 
 /* ensure finale flower field hidden on initial paint */
 .finale-flowers { position: absolute; inset: 0; pointer-events: none; opacity: 0; overflow: visible; }
+.finale-sparks { position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: 0; overflow: hidden; }
+.finale-sparks__item { position: absolute; will-change: transform, opacity; }
+.finale-sparks__item--heart {
+  transform: rotate(45deg);
+  border-radius: 3px;
+  background: currentColor;
+  animation: finaleHeartFloat linear infinite;
+  filter: drop-shadow(0 3px 8px rgba(255,120,160,0.35));
+}
+.finale-sparks__item--heart::before,
+.finale-sparks__item--heart::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; background: inherit; }
+.finale-sparks__item--heart::before { left: -50%; top: 0; }
+.finale-sparks__item--heart::after { left: 0; top: -50%; }
+.finale-sparks__item--star {
+  background: radial-gradient(circle at 50% 45%, rgba(255,255,255,1) 0%, currentColor 45%, rgba(255,255,255,0) 100%);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 72%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: finaleStarTwinkle ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(255,246,220,0.7));
+}
+@keyframes finaleHeartFloat {
+  0% { transform: translate3d(0, 20px, 0) rotate(45deg) scale(0.6); opacity: 0; }
+  12% { opacity: 0.9; }
+  50% { transform: translate3d(var(--drift, 30px), -40px, 0) rotate(45deg) scale(1); opacity: 0.95; }
+  100% { transform: translate3d(calc(var(--drift, 30px) * -0.4), -80px, 0) rotate(45deg) scale(0.7); opacity: 0; }
+}
+@keyframes finaleStarTwinkle {
+  0%, 100% { transform: scale(0.4) rotate(0deg); opacity: 0.15; }
+  50% { transform: scale(1) rotate(22deg); opacity: 0.95; }
+}
 .finale-flowers__item { opacity: 0; transform-origin: 50% 100%; will-change: transform, opacity; }
 .finale-flowers__svg { display: block; width: 100%; height: auto; overflow: visible; animation: finale-bloom 3.6s ease-in-out infinite; filter: drop-shadow(0 6px 14px rgba(160,60,90,0.18)); }
 .finale-flowers__item:nth-child(3n) .finale-flowers__svg { animation-duration: 4.2s; animation-delay: -0.6s; }
@@ -2143,3 +2206,22 @@ html.is-cinema body {
 .box3d__tag-heart::before,.box3d__tag-heart::after { content:''; position:absolute; width:10px; height:10px; background:#e9a8bb; border-radius:50%; }
 .box3d__tag-heart::before { left:-5px; top:0; }
 .box3d__tag-heart::after { left:0; top:-5px; }
+
+/* bouquet image wrapper + glitter */
+.bouquet-wrap { position: relative; display: block; width: 100%; height: auto; }
+.bouquet-wrap .bouquet { display: block; width: 100%; height: auto; }
+.bouquet__sparkles { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.bouquet__sparkle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(255,246,210,0.95) 35%, rgba(255,230,180,0.35) 60%, rgba(255,255,255,0) 100%);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 72%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  filter: drop-shadow(0 0 6px rgba(255,246,220,0.95)) drop-shadow(0 0 12px rgba(255,220,160,0.7));
+  animation: bouquetGlitter ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes bouquetGlitter {
+  0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.35) rotate(0deg); }
+  35% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(18deg); }
+  65% { opacity: 0.85; transform: translate(-50%, -50%) scale(0.7) rotate(36deg); }
+}

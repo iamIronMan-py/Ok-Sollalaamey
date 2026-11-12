@@ -36,6 +36,27 @@ const PETALS = Array.from({ length: 26 }, (_, i) => ({
   rotate: (i * 47) % 360,
   color: ['#b3122f', '#8b6bd1', '#e0405a', '#a58ae0', '#c9184a'][i % 5],
 }));
+const DOOR_HEARTS = Array.from({ length: 48 }, (_, i) => ({
+  left: (i * 21.13 + 3) % 100,
+  bottom: (i * 17.7) % 88,
+  size: 10 + (i % 6) * 5,
+  delay: (i % 12) * 0.45,
+  dur: 4.2 + (i % 5) * 1.3,
+  drift: ((i * 37) % 120) - 60,
+  color: ['#ff6f91', '#ff9fb0', '#ffb3c1', '#f089a6', '#e0405a', '#ffc2d4'][i % 6],
+  opacity: 0.45 + (i % 5) * 0.12,
+}));
+const FINALE_SPARKS = Array.from({ length: 90 }, (_, i) => ({
+  left: (i * 11.17 + 1) % 100,
+  top: (i * 13.73 + 2) % 100,
+  size: i % 4 === 0 ? 14 + (i % 4) * 4 : i % 4 === 1 ? 10 + (i % 3) * 3 : 5 + (i % 4) * 2,
+  kind: i % 4 === 0 ? 'star' : 'heart',
+  delay: (i % 14) * 0.4,
+  dur: 3.6 + (i % 7) * 0.8,
+  drift: ((i * 29) % 160) - 80,
+  color: i % 4 === 0 ? ['#fff6d6', '#ffe8a3', '#fffdf2', '#f7e7b0', '#ffffff'][i % 5] : ['#ff6f91', '#ff9fb0', '#e0405a', '#ffb3c1', '#c9b6f2', '#ffd1e1'][i % 6],
+  opacity: 0.5 + (i % 5) * 0.1,
+}));
 const BLOOM_FLIGHT = [
   { left: 3, top: 6, size: 'far', color: 'rgba(255,255,255,0.95)', delay: 0.2, dur: 2.8, points: 5 },
   { left: 8, top: 18, size: 'mid', color: 'rgba(255,214,232,0.95)', delay: 1.1, dur: 3.4, points: 4 },
@@ -404,24 +425,23 @@ export function Experience() {
       const parcelOut = smooth(0.206, 0.224, p);
       setTransform('[data-parcel]', `translateY(${-260 * (1 - parcelDrop) + 90 * parcelOut}px) rotate(${-11 * (1 - parcelDrop) + 7 * parcelOut}deg) scale(${0.82 + 0.18 * parcelDrop - 0.1 * parcelOut})`, parcelDrop * (1 - parcelOut));
 
-      const takeU = clamp01((p - 0.155) / 0.105);
+      const takeU = clamp01((p - 0.155) / 0.11);
       const flightLayer = root.querySelector('[data-flight]') as HTMLElement | null;
       if (flightLayer) flightLayer.style.opacity = String(p >= 0.15 && p < 0.78 ? 1 : 0);
       if (p >= 0.155 && p < 0.265) {
-        if (!takeoffSoundStarted && takeU > 0.32) { storyAudio.play('takeoff'); takeoffSoundStarted = true; }
+        if (!takeoffSoundStarted && takeU > 0.28) { storyAudio.play('takeoff'); takeoffSoundStarted = true; }
         flightRef.current?.setTakeoff(takeU);
       } else if (p >= 0.265 && p < 0.76) {
         if (takeoffSoundStarted) { storyAudio.stopTakeoff(); takeoffSoundStarted = false; }
         const ft = clamp01((p - 0.265) / 0.455);
         flightRef.current?.setProgress(ft);
-        if (ft > 0.88) storyAudio.stopCruise();
+        if (ft > 0.92) storyAudio.stopCruise();
         else storyAudio.startCruise();
         if (!landingCueDone && ft >= 0.84) { storyAudio.play('landing'); landingCueDone = true; }
         if (ft < 0.72) landingCueDone = false;
         if (distanceRef.current) distanceRef.current.textContent = `${Math.round(ft * 6700).toLocaleString('en-US')} km`;
         let st = 'Cruising over the Atlantic';
-        if (ft < 0.04) st = 'Preparing for takeoff';
-        else if (ft < 0.2) st = 'Lifting off from Dubai';
+        if (ft < 0.2) st = 'Lifting off from Dubai';
         else if (ft >= 0.84) st = 'Touchdown, Paris';
         else if (ft > 0.72) st = 'Descending into Paris';
         if (statusRef.current) statusRef.current.textContent = st;
@@ -474,6 +494,7 @@ export function Experience() {
       setTransform('[data-finale-friends]', `translateY(${44 * (1 - friendsIn)}px) scale(${0.9 + 0.1 * friendsIn})`, friendsIn);
       setOpacity('[data-petals]', smooth(0.932, 0.96, p));
       setOpacity('[data-finale-flowers]', smooth(0.93, 0.965, p));
+      setOpacity('[data-finale-sparks]', smooth(0.928, 0.958, p));
       q('[data-finale-flower]').forEach((el, i) => {
         const fin = smooth(0.928 + i * 0.002, 0.958 + i * 0.002, p);
         const phase = (el as HTMLElement).dataset.phase ? Number((el as HTMLElement).dataset.phase) : i * 0.45;
@@ -506,12 +527,11 @@ export function Experience() {
         const userScrolling = now < userScrollUntil;
         let speed = boosted ? 0.05 : 0.007;
         if (userScrolling && !boosted) speed = 0.0015;
-        if (progressRef.current >= 0.155 && progressRef.current < 0.32) speed = Math.max(speed, 0.012);
-        if (progressRef.current >= 0.64 && progressRef.current < 0.755) speed = Math.min(speed, 0.004);
+        if (progressRef.current >= 0.155 && progressRef.current < 0.76) speed = Math.max(speed, 0.012);
         if (progressRef.current >= 0.84 && progressRef.current < 0.9 && boxOpenRef.current < 0.98) speed = Math.min(speed, 0.001);
         if (progressRef.current < 1) {
           progressRef.current = Math.min(1, progressRef.current + speed * dt);
-          if (!userScrolling || boosted || (progressRef.current >= 0.155 && progressRef.current < 0.32)) syncScrollFromProgress(progressRef.current);
+          if (!userScrolling || boosted || (progressRef.current >= 0.155 && progressRef.current < 0.76)) syncScrollFromProgress(progressRef.current);
         }
       }
       update(progressRef.current, dt, now);
@@ -595,6 +615,15 @@ export function Experience() {
         <div className="petals" data-petals aria-hidden="true">
           {PETALS.map((petal, i) => (<span key={i} style={{ left: `${petal.left}%`, width: petal.size, height: petal.size * 0.72, background: petal.color }} />))}
         </div>
+        <div className="finale-sparks" data-finale-sparks aria-hidden="true" style={{ opacity: 0 }}>
+          {FINALE_SPARKS.map((s, i) => (
+            <span
+              key={i}
+              className={`finale-sparks__item finale-sparks__item--${s.kind}`}
+              style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, color: s.color, animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s`, ['--drift' as any]: `${s.drift}px`, opacity: s.opacity }}
+            />
+          ))}
+        </div>
         <main className="copy">
           <section className="chapter chapter--intro" aria-labelledby="intro-title"><div className="copy__block copy__block--left"><p className="eyebrow" data-copy>A little surprise, wrapped with love</p><h1 className="display" id="intro-title"><span className="line" data-copy>A little <em>surprise</em></span><span className="line" data-copy>is on its way...</span></h1><p className="lede" data-copy>It began in Dubai, among warm golden evenings and quiet wishes. Now it is crossing oceans and skies - travelling a very long way just to make you smile.</p><div className="scroll-hint" data-scroll-hint><span className="scroll-hint__line" />Scroll to begin</div></div></section>
           <section className="chapter chapter--dubai" aria-labelledby="dubai-title"><div className="copy__block copy__block--left"><p className="eyebrow" data-copy>Chapter one . Wrapped in Dubai</p><h2 className="display" id="dubai-title" data-copy>First, a little <em>something</em> was wrapped just for you.</h2><p className="lede" data-copy>Ribbons tied by hand, a tag written with care, and a tiny parcel carrying far more love than it looks like it could hold.</p><div className="shipping" data-copy><div className="shipping__item"><span className="shipping__label">From</span><span className="shipping__value">Dubai</span></div><div className="shipping__item"><span className="shipping__label">To</span><span className="shipping__value">Paris</span></div><div className="shipping__item"><span className="shipping__label">With</span><span className="shipping__value">Love</span></div></div></div></section>
@@ -617,7 +646,15 @@ export function Experience() {
             <div className="doorway">
               <div className="doorway__frame"><div className="doorway__light" /><div className="doorway__door doorway__door--left"><span className="doorway__panel" /><span className="doorway__knob" /></div><div className="doorway__door doorway__door--right"><span className="doorway__panel" /></div></div>
               <div className="doorway__puppy"><svg viewBox="36 56 288 282"><Puppy withParcel crown withRose /></svg></div>
-              <span className="doorway__heart doorway__heart--1" /><span className="doorway__heart doorway__heart--2" /><span className="doorway__heart doorway__heart--3" />
+              <div className="doorway__bubbles" aria-hidden="true">
+                {DOOR_HEARTS.map((h, i) => (
+                  <span
+                    key={i}
+                    className="doorway__bubble"
+                    style={{ left: `${h.left}%`, bottom: `${h.bottom}%`, width: h.size, height: h.size, background: h.color, animationDelay: `${h.delay}s`, animationDuration: `${h.dur}s`, ['--drift' as any]: `${h.drift}px`, opacity: h.opacity }}
+                  />
+                ))}
+              </div>
             </div>
             <p className="cutscene__caption">A little friend is at your door</p>
           </div>
