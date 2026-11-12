@@ -25,7 +25,7 @@ export const GiftBox3D = forwardRef<HTMLDivElement, Props>(function GiftBox3D({ 
     if (lid) lid.style.transform = `translateZ(0px) rotateX(${t * -125}deg) translateY(${-t * 2}px)`;
     if (contents) {
       contents.style.opacity = String(roseReveal);
-      contents.style.transform = `translateX(-50%) translateY(${18 - roseEase * 40}%) scale(${0.86 + roseEase * 0.18})`;
+      contents.style.transform = `translateX(-50%) translateY(${18 - roseEase * 40}%) scale(${(0.86 + roseEase * 0.18) * 0.8})`;
     }
     if (glow) glow.style.opacity = String((0.2 + t * 0.95) * boxFade);
     if (aura) aura.style.opacity = String(t * boxFade);

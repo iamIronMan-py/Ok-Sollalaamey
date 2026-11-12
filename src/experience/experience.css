@@ -231,7 +231,7 @@ body {
 
 .object--box {
   left: 72%;
-  top: 54%;
+  top: 60%;
   width: min(520px, 46vw);
   transform: translate(-50%, -50%);
   margin-top: 0;
@@ -645,7 +645,7 @@ body {
   position: absolute;
   left: 50%;
   bottom: 30%;
-  width: calc(var(--box) * 1.75);
+  width: min(352px, 28.8vw);
   height: auto;
   opacity: 0;
   transform: translateX(-50%) translateY(4%) scale(0.9);
@@ -1110,203 +1110,56 @@ body {
 
 /* ------------------------------- interactions ------------------------------- */
 
-.story-gate {
+/* finale controls */
+.finale-controls {
   position: absolute;
-  right: clamp(20px, 5vw, 72px);
-  bottom: clamp(64px, 9vh, 96px);
-  z-index: 9;
-  pointer-events: none;
-}
-
-.story-gate__btn {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.72rem;
-  min-height: 48px;
-  min-width: 48px;
-  padding: 0.78rem 1.35rem;
-  border: 1px solid rgba(231, 201, 143, 0.64);
-  border-radius: 999px;
-  background:
-    radial-gradient(130% 150% at 12% 0%, rgba(201, 182, 242, 0.42) 0%, transparent 48%),
-    linear-gradient(132deg, #7a0b20 0%, #b3122f 52%, #c96a86 100%);
-  color: #fff8f2;
-  font-family: var(--sans);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  cursor: pointer;
-  box-shadow:
-    0 14px 34px rgba(90, 10, 30, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  transition:
-    transform 0.24s ease,
-    box-shadow 0.24s ease,
-    border-color 0.24s ease,
-    filter 0.24s ease;
-  animation: gate-pulse 3.4s ease-in-out infinite;
-}
-
-.story-gate__btn::before {
-  content: '';
-  position: absolute;
-  inset: -20% -40%;
-  z-index: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 28%,
-    rgba(255, 255, 255, 0.3) 46%,
-    rgba(201, 182, 242, 0.28) 54%,
-    transparent 72%
-  );
-  transform: translateX(-130%) rotate(6deg);
-  animation: gate-shimmer 4.8s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.story-gate__btn > span {
-  position: relative;
-  z-index: 1;
-}
-
-.story-gate__btn:hover {
-  transform: translateY(-2px) scale(1.012);
-  border-color: rgba(246, 227, 185, 0.9);
-  box-shadow:
-    0 18px 40px rgba(90, 10, 30, 0.42),
-    0 0 26px rgba(201, 182, 242, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  filter: saturate(1.08);
-}
-
-.story-gate__btn:active {
-  transform: translateY(1px) scale(0.985);
-  transition-duration: 0.09s;
-}
-
-.story-gate__btn:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px rgba(255, 248, 242, 0.95),
-    0 0 0 6px rgba(139, 107, 209, 0.72),
-    0 16px 36px rgba(90, 10, 30, 0.4);
-}
-
-.story-gate__arrow {
-  display: inline-grid;
-  place-items: center;
-  font-size: 0.95rem;
-  letter-spacing: 0;
-  transition: transform 0.24s ease;
-}
-
-.story-gate__btn:hover .story-gate__arrow {
-  transform: translateX(4px);
-}
-
-.fullscreen-toggle {
-  position: absolute;
-  top: clamp(48px, 6.4vh, 72px);
-  right: clamp(20px, 4vw, 54px);
-  z-index: 9;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 1px solid rgba(139, 107, 209, 0.42);
-  border-radius: 14px;
-  background: linear-gradient(148deg, rgba(255, 253, 251, 0.86), rgba(247, 224, 232, 0.7));
-  color: #7a0b20;
-  cursor: pointer;
-  box-shadow:
-    0 10px 26px rgba(90, 10, 30, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  transition:
-    transform 0.24s ease,
-    box-shadow 0.24s ease,
-    border-color 0.24s ease,
-    background 0.24s ease;
-}
-
-.fullscreen-toggle svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.fullscreen-toggle:hover {
-  background: linear-gradient(148deg, rgba(255, 253, 251, 0.96), rgba(241, 213, 224, 0.86));
-  border-color: rgba(179, 18, 47, 0.52);
-  transform: translateY(-2px);
-  box-shadow:
-    0 14px 30px rgba(90, 10, 30, 0.22),
-    0 0 20px rgba(201, 182, 242, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.fullscreen-toggle:active {
-  transform: translateY(0) scale(0.96);
-}
-
-.fullscreen-toggle:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px rgba(255, 248, 242, 0.95),
-    0 0 0 6px rgba(139, 107, 209, 0.72);
-}
-
-html.is-cinema,
-html.is-cinema body {
-  overflow: hidden;
-}
-
-.is-cinema .copy,
-.is-cinema .hud,
-.is-cinema .objects,
-.is-cinema .story-gate {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-.is-takeoff-active .story-gate,
-.is-takeoff-active .story-gate__btn {
+  left: 50%;
+  bottom: clamp(24px, 6vh, 56px);
+  transform: translateX(-50%);
+  z-index: 22;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.5s ease;
 }
-
-.is-takeoff-scene [data-flight],
-.is-handover [data-flight] {
-  opacity: 1 !important;
+.finale-controls[aria-hidden="false"] { pointer-events: auto; }
+.finale-controls__btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  padding: 0.95rem 2.2rem;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(135deg, #c9184a 0%, #e0405a 45%, #b3122f 100%);
+  box-shadow: 0 14px 40px rgba(179, 18, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
-
-.story-gate {
-  transition: opacity 0.35s ease;
+.finale-controls__btn--restart {
+  background: linear-gradient(135deg, #5c3fa8 0%, #8b6bd1 45%, #6d4ec4 100%);
+  box-shadow: 0 14px 40px rgba(92, 63, 168, 0.35), inset 0 1px 0 rgba(255,255,255,0.35);
 }
+.finale-controls__btn:hover { transform: translateY(-2px) scale(1.02); filter: brightness(1.05); }
+.finale-controls__btn:active { transform: translateY(0) scale(0.98); }
 
-.doorway__puppy {
-  transform-origin: 50% 90%;
+.touch-hearts { position: absolute; inset: 0; z-index: 21; pointer-events: none; overflow: visible; }
+.touch-heart {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-radius: 4px;
+  opacity: 0;
+  animation: touchHeartFloat ease-out forwards;
+  filter: drop-shadow(0 4px 10px rgba(255,120,160,0.4));
 }
-
-.cutscene[data-scene='door'][data-active='true'] .doorway__puppy {
-  animation: puppyArrive 8s cubic-bezier(0.4, 0, 0.3, 1) both, puppyHop 0.5s ease-in-out 0.6s 8;
+.touch-heart::before, .touch-heart::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; background: inherit; }
+.touch-heart::before { left: -50%; top: 0; }
+.touch-heart::after { left: 0; top: -50%; }
+@keyframes touchHeartFloat {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(0.4); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -80px))) rotate(45deg) scale(1.15); }
 }
-
-@keyframes puppyHop {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -18px; }
-}
-
 .celebration {
   position: absolute;
   inset: 0;
@@ -1325,7 +1178,12 @@ html.is-cinema body {
 }
 .confetti--petal {
   border-radius: 70% 30% 70% 30% / 60% 40% 60% 40%;
-  filter: drop-shadow(0 0 4px rgba(255,180,200,0.35));
+  filter: drop-shadow(0 0 6px rgba(255,180,200,0.45));
+}
+.confetti--flower {
+  border-radius: 60% 40% 60% 40% / 55% 45% 55% 45%;
+  filter: drop-shadow(0 0 8px rgba(255,180,210,0.45));
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25);
 }
 .confetti--star {
   border-radius: 0;
@@ -1471,6 +1329,10 @@ html.is-cinema body {
     width: min(320px, 52vw);
   }
 
+  .box3d__contents {
+    width: min(256px, 41.6vw);
+  }
+
   .chapter--unbox .copy__block {
     max-width: 100%;
     margin: 0 auto;
@@ -1528,7 +1390,7 @@ html.is-cinema body {
 
   .object--box {
     left: 50%;
-    top: 68%;
+    top: 74%;
     width: min(470px, 78vw);
   }
 
@@ -1603,6 +1465,10 @@ html.is-cinema body {
     width: min(340px, 84vw);
   }
 
+  .box3d__contents {
+    width: min(272px, 67.2vw);
+  }
+
   .lede {
     font-size: 0.9rem;
     line-height: 1.72;
@@ -1643,7 +1509,7 @@ html.is-cinema body {
 
   .object--box {
     left: 50%;
-    top: 73%;
+    top: 78%;
     width: 84vw;
   }
 

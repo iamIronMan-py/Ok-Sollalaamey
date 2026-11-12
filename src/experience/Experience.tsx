@@ -10,16 +10,6 @@ import { GiftBox3D } from './GiftBox3D';
 import { storyAudio } from './audio';
 import { GIFT } from '../config';
 import './experience.css';
-
-const GATE_LABELS = [
-  'Open the letter',
-  'Send from Dubai',
-  'Start the journey',
-  'Meet your little friend',
-  'Meet her at the door',
-  'Open the gift',
-  'Celebrate',
-];
 const CHAPTERS = [
   { at: 0, name: 'A little surprise' },
   { at: 11, name: 'Wrapped in Dubai' },
@@ -230,25 +220,57 @@ export function Experience() {
   const distanceRef = useRef<HTMLSpanElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const flightBarRef = useRef<HTMLSpanElement>(null);
-  const gateLabelRef = useRef<HTMLSpanElement>(null);
   const progressFillRef = useRef<HTMLSpanElement>(null);
   const cutsceneRef = useRef<HTMLDivElement>(null);
   const celebrationRef = useRef<HTMLDivElement>(null);
+  const touchHeartsRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef(0);
   const boxOpenRef = useRef(0);
   const unboxDwellRef = useRef(0);
+  const finaleUiRef = useRef<'none' | 'celebrate' | 'restart'>('none');
   const [boxOpen, setBoxOpen] = useState(0);
+  const [finaleUi, setFinaleUi] = useState<'none' | 'celebrate' | 'restart'>('none');
 
-  const handleGate = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  const handleStagePointer = (e: React.PointerEvent<HTMLDivElement>) => {
     storyAudio.unlock();
-    (window as any).__advanceToNext?.();
+    if (progressRef.current < 0.93) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-finale-controls]')) return;
+    const layer = touchHeartsRef.current;
+    if (!layer) return;
+    const rect = layer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const hearts = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < hearts; i += 1) {
+      const h = document.createElement('span');
+      h.className = 'touch-heart';
+      const size = 14 + Math.random() * 18;
+      h.style.left = `${x + (Math.random() - 0.5) * 24}px`;
+      h.style.top = `${y + (Math.random() - 0.5) * 24}px`;
+      h.style.width = `${size}px`;
+      h.style.height = `${size}px`;
+      h.style.setProperty('--dx', `${(Math.random() - 0.5) * 120}px`);
+      h.style.setProperty('--dy', `${-40 - Math.random() * 120}px`);
+      h.style.animationDuration = `${1.4 + Math.random() * 1.1}s`;
+      h.style.background = ['#ff6f91', '#ff9fb0', '#ffb3c1', '#e0405a', '#ffc2d4'][i % 5];
+      layer.appendChild(h);
+      window.setTimeout(() => h.remove(), 2600);
+    }
   };
 
-  const handleStagePointer = () => {
+  const triggerFinaleCelebration = (e: React.MouseEvent) => {
+    e.stopPropagation();
     storyAudio.unlock();
-    (window as any).__advanceToNext?.();
-    (window as any).__advanceToNext?.();
+    if (finaleUiRef.current !== 'celebrate') return;
+    (window as any).__spawnPartyBlast?.();
+    finaleUiRef.current = 'restart';
+    setFinaleUi('restart');
+  };
+
+  const restartExperience = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.location.reload();
   };
 
 
@@ -279,7 +301,6 @@ export function Experience() {
     let bloomBarkDone = false;
     let takeoffSoundStarted = false;
     let landingCueDone = false;
-    let celebrationDone = false;
     let syncedScrollTop = 0;
     progressRef.current = 0;
     boxOpenRef.current = 0;
@@ -317,29 +338,35 @@ export function Experience() {
       const layer = celebrationRef.current;
       if (!layer) return;
       layer.replaceChildren();
-      const colors = ['#b3122f', '#8b6bd1', '#e0405a', '#a58ae0', '#c9184a', '#c9b6f2', '#f3d7a2', '#ff9fb0'];
-      const burst = (count: number, delayBase: number) => {
+      const colors = ['#b3122f', '#8b6bd1', '#e0405a', '#a58ae0', '#c9184a', '#c9b6f2', '#f3d7a2', '#ff9fb0', '#ff6f91', '#ffb3c1'];
+      const burst = (count: number, delayBase: number, power = 1) => {
         for (let i = 0; i < count; i += 1) {
           const piece = document.createElement('span');
-          const isPetal = i % 3 === 0;
-          const isStar = i % 7 === 0;
-          const size = isPetal ? 8 + Math.random() * 10 : 5 + Math.random() * 9;
-          piece.className = isPetal ? 'confetti confetti--petal' : isStar ? 'confetti confetti--star' : 'confetti';
+          const r = Math.random();
+          const isFlower = r < 0.55;
+          const isPetal = !isFlower && r < 0.78;
+          const isStar = !isFlower && !isPetal && r < 0.9;
+          const size = isFlower ? 14 + Math.random() * 18 : isPetal ? 10 + Math.random() * 12 : 6 + Math.random() * 10;
+          piece.className = isFlower ? 'confetti confetti--flower' : isPetal ? 'confetti confetti--petal' : isStar ? 'confetti confetti--star' : 'confetti';
           piece.style.left = `${Math.random() * 100}%`;
           piece.style.width = `${size}px`;
-          piece.style.height = isPetal ? `${size * 1.25}px` : `${size * (0.45 + Math.random() * 0.7)}px`;
+          piece.style.height = isFlower ? `${size * 1.25}px` : isPetal ? `${size * 1.3}px` : `${size * (0.5 + Math.random() * 0.7)}px`;
           piece.style.background = colors[i % colors.length];
-          piece.style.animationDelay = `${delayBase + Math.random() * 0.9}s`;
-          piece.style.animationDuration = `${3.2 + Math.random() * 2.6}s`;
-          piece.style.setProperty('--drift', `${(Math.random() - 0.5) * 320}px`);
-          piece.style.setProperty('--spin', `${Math.random() * 1080 - 540}deg`);
+          piece.style.animationDelay = `${delayBase + Math.random() * 0.8}s`;
+          piece.style.animationDuration = `${3.6 + Math.random() * 3.2}s`;
+          piece.style.setProperty('--drift', `${(Math.random() - 0.5) * (420 * power)}px`);
+          piece.style.setProperty('--spin', `${Math.random() * 1440 - 720}deg`);
           layer.appendChild(piece);
         }
       };
-      burst(70, 0);
-      window.setTimeout(() => burst(45, 0.2), 900);
-      window.setTimeout(() => layer.replaceChildren(), 9000);
+      burst(180, 0, 1.1);
+      window.setTimeout(() => burst(140, 0.35, 1.2), 350);
+      window.setTimeout(() => burst(160, 0.75, 1.25), 900);
+      window.setTimeout(() => burst(120, 1.15, 1.1), 1500);
+      window.setTimeout(() => burst(100, 1.6, 1), 2200);
+      window.setTimeout(() => layer.replaceChildren(), 12000);
     };
+    (window as any).__spawnPartyBlast = spawnCelebration;
 
     const startDoor = (onDone?: () => void) => {
       if (cutscene) return;
@@ -358,25 +385,6 @@ export function Experience() {
       window.setTimeout(() => storyAudio.play('bark'), 3000);
     };
 
-    (window as any).__advanceToNext = () => {
-      storyAudio.unlock();
-      boostUntil = performance.now() + 2600;
-      if (cutscene) return;
-      const p = progressRef.current;
-      if (p >= 0.72 && p < 0.785) {
-        startDoor(() => { progressRef.current = Math.max(progressRef.current, 0.785); syncScrollFromProgress(progressRef.current); });
-        return;
-      }
-      if (p >= 0.81 && p < 0.93) {
-        boxOpenRef.current = Math.min(1, boxOpenRef.current + 0.35);
-        setBoxOpen(boxOpenRef.current);
-      }
-      if (p >= 0.93 && !celebrationDone) {
-        celebrationDone = true;
-        spawnCelebration();
-      }
-    };
-
     const update = (p: number, dt: number, now: number) => {
       p = clamp01(p);
       (window as any).__lastP = p;
@@ -389,7 +397,6 @@ export function Experience() {
       root.dataset.chapter = String(chapter);
       if (chapterNumRef.current) chapterNumRef.current.textContent = String(chapter + 1).padStart(2, '0');
       if (chapterNameRef.current) chapterNameRef.current.textContent = CHAPTERS[chapter].name;
-      if (gateLabelRef.current) gateLabelRef.current.textContent = GATE_LABELS[chapter];
       if (progressFillRef.current) progressFillRef.current.style.transform = `scaleX(${p})`;
 
       const hud = root.querySelector('.hud') as HTMLElement | null;
@@ -489,12 +496,19 @@ export function Experience() {
       }
       if (Math.abs(boxOpenRef.current - boxOpen) > 0.01) setBoxOpen(boxOpenRef.current);
 
+      if (p >= 0.955 && finaleUiRef.current === 'none') {
+        finaleUiRef.current = 'celebrate';
+        setFinaleUi('celebrate');
+      }
+
       q('.chapter--finale [data-copy]').forEach((el,i)=>{ const o=smooth(0.929+i*0.004,0.96+i*0.004,p); el.style.opacity=String(clamp01(o)); el.style.transform=`translateY(${(1-o)*40}px)`; });
       const friendsIn = smooth(0.936, 0.968, p);
       setTransform('[data-finale-friends]', `translateY(${44 * (1 - friendsIn)}px) scale(${0.9 + 0.1 * friendsIn})`, friendsIn);
       setOpacity('[data-petals]', smooth(0.932, 0.96, p));
       setOpacity('[data-finale-flowers]', smooth(0.93, 0.965, p));
       setOpacity('[data-finale-sparks]', smooth(0.928, 0.958, p));
+      const controlsIn = smooth(0.952, 0.97, p);
+      setOpacity('[data-finale-controls]', controlsIn);
       q('[data-finale-flower]').forEach((el, i) => {
         const fin = smooth(0.928 + i * 0.002, 0.958 + i * 0.002, p);
         const phase = (el as HTMLElement).dataset.phase ? Number((el as HTMLElement).dataset.phase) : i * 0.45;
@@ -638,7 +652,14 @@ export function Experience() {
           <div className="hud__flight" data-flight-hud><div className="hud__flight-row"><span className="hud__flight-route">DXB ? ORY</span><span className="hud__flight-distance" ref={distanceRef}>0 km</span></div><div className="hud__flight-status" ref={statusRef}>Preparing for takeoff</div><div className="hud__flight-bar"><span ref={flightBarRef} /></div></div>
           <div className="hud__bottom"><span className="hud__meta">Dubai</span><div className="hud__progress"><span className="hud__progress-fill" ref={progressFillRef} /></div><span className="hud__meta">Paris</span></div>
         </div>
-        <div className="story-gate"><button className="story-gate__btn" type="button" onClick={handleGate}><span ref={gateLabelRef}>Open the letter</span><span className="story-gate__arrow" aria-hidden="true">?</span></button></div>
+        <div className="finale-controls" data-finale-controls aria-hidden={finaleUi === 'none'}>
+          {finaleUi === 'celebrate' && (
+            <button className="finale-controls__btn finale-controls__btn--celebrate" type="button" onPointerDown={(e) => e.stopPropagation()} onClick={triggerFinaleCelebration}>Celebrate</button>
+          )}
+          {finaleUi === 'restart' && (
+            <button className="finale-controls__btn finale-controls__btn--restart" type="button" onPointerDown={(e) => e.stopPropagation()} onClick={restartExperience}>Start again</button>
+          )}
+        </div>
 
         <div className="cutscene" ref={cutsceneRef} data-active="false" aria-hidden="true">
           <div className="cutscene__veil" />
@@ -659,6 +680,7 @@ export function Experience() {
             <p className="cutscene__caption">A little friend is at your door</p>
           </div>
         </div>
+        <div className="touch-hearts" ref={touchHeartsRef} aria-hidden="true" />
         <div className="celebration" ref={celebrationRef} aria-hidden="true" />
       </div>
       <div className="exp__track" aria-hidden="true" />
