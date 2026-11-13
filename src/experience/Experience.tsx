@@ -230,6 +230,16 @@ export function Experience() {
   const finaleUiRef = useRef<'none' | 'celebrate' | 'restart'>('none');
   const [boxOpen, setBoxOpen] = useState(0);
   const [finaleUi, setFinaleUi] = useState<'none' | 'celebrate' | 'restart'>('none');
+  const [started, setStarted] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [splashLeaving, setSplashLeaving] = useState(false);
+
+  const handleStart = () => {
+    storyAudio.unlock();
+    setStarted(true);
+    setSplashLeaving(true);
+    window.setTimeout(() => setShowSplash(false), 1400);
+  };
 
   const handleStagePointer = (e: React.PointerEvent<HTMLDivElement>) => {
     storyAudio.unlock();
@@ -276,6 +286,7 @@ export function Experience() {
 
 
   useEffect(() => {
+    if (!started) return;
     const root = rootRef.current;
     if (!root) return;
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -331,8 +342,6 @@ export function Experience() {
     window.addEventListener('keydown', unlockAudio);
     window.addEventListener('scroll', unlockAudio, { passive: true });
     storyAudio.unlock();
-    const autoplayRetry = window.setInterval(() => storyAudio.unlock(), 1200);
-    const autoplayStop = window.setTimeout(() => window.clearInterval(autoplayRetry), 45000);
 
     const spawnCelebration = () => {
       const layer = celebrationRef.current;
@@ -554,8 +563,6 @@ export function Experience() {
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.clearInterval(autoplayRetry);
-      window.clearTimeout(autoplayStop);
       storyAudio.stopCruise();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointerdown', unlockAudio);
@@ -564,10 +571,94 @@ export function Experience() {
       window.removeEventListener('keydown', unlockAudio);
       window.removeEventListener('scroll', unlockAudio);
     };
-  }, []);
+  }, [started]);
+
+  const SPLASH_SPARKS = Array.from({ length: 40 }, (_, i) => ({
+    left: `${(i * 13.7 + 2) % 100}%`,
+    top: `${(i * 17.3 + 5) % 100}%`,
+    size: 4 + (i % 5) * 2.5,
+    delay: (i % 10) * 0.35,
+    dur: 2.2 + (i % 5) * 0.7,
+  }));
+  const SPLASH_HEARTS = Array.from({ length: 26 }, (_, i) => ({
+    left: `${(i * 7.9 + 1) % 100}%`,
+    delay: (i % 13) * 0.45,
+    dur: 6 + (i % 5) * 1.4,
+    size: 10 + (i % 4) * 5,
+    opacity: 0.22 + (i % 4) * 0.1,
+  }));
+  const SPLASH_PETALS = Array.from({ length: 22 }, (_, i) => ({
+    left: `${(i * 9.3 + 4) % 100}%`,
+    delay: (i % 11) * 0.5,
+    dur: 7 + (i % 5) * 1.6,
+    size: 10 + (i % 5) * 4,
+    rot: (i * 47) % 360,
+    color: ['#ff9fb0', '#ffb3c1', '#ffc2d4', '#f089a6', '#e89aae'][i % 5],
+  }));
+  const SPLASH_BOKEH = Array.from({ length: 18 }, (_, i) => ({
+    left: `${(i * 11.1 + 3) % 100}%`,
+    top: `${(i * 13.3 + 7) % 100}%`,
+    size: 30 + (i % 6) * 18,
+    delay: (i % 6) * 0.8,
+    dur: 5 + (i % 4) * 1.2,
+    color: ['rgba(255,182,206,0.25)', 'rgba(255,220,235,0.3)', 'rgba(255,240,245,0.35)', 'rgba(232,154,174,0.22)'][i % 4],
+  }));
 
   return (
     <div className="exp" ref={rootRef}>
+      {showSplash && (
+        <div className={`presplash ${splashLeaving ? 'is-leaving' : ''}`} role="dialog" aria-label="Start experience">
+          <div className="presplash__bg" aria-hidden="true">
+            <div className="presplash__glow presplash__glow--a" />
+            <div className="presplash__glow presplash__glow--b" />
+            <div className="presplash__glow presplash__glow--c" />
+            <div className="presplash__glow presplash__glow--d" />
+            <div className="presplash__frame" />
+          </div>
+          <div className="presplash__bokeh" aria-hidden="true">
+            {SPLASH_BOKEH.map((b, i) => (
+              <span key={i} className="presplash__bokeh-dot" style={{ left: b.left, top: b.top, width: b.size, height: b.size, background: b.color, animationDelay: `${b.delay}s`, animationDuration: `${b.dur}s` }} />
+            ))}
+          </div>
+          <div className="presplash__ribbon presplash__ribbon--tl" aria-hidden="true" />
+          <div className="presplash__ribbon presplash__ribbon--tr" aria-hidden="true" />
+          <div className="presplash__ribbon presplash__ribbon--bl" aria-hidden="true" />
+          <div className="presplash__ribbon presplash__ribbon--br" aria-hidden="true" />
+          <div className="presplash__garland presplash__garland--top" aria-hidden="true" />
+          <div className="presplash__garland presplash__garland--bottom" aria-hidden="true" />
+          <div className="presplash__sparkles" aria-hidden="true">
+            {SPLASH_SPARKS.map((s, i) => (
+              <span key={i} className={`presplash__sparkle ${i % 3 === 0 ? 'presplash__sparkle--star' : ''}`} style={{ left: s.left, top: s.top, width: s.size, height: s.size, animationDelay: `${s.delay}s`, animationDuration: `${s.dur}s` }} />
+            ))}
+          </div>
+          <div className="presplash__hearts" aria-hidden="true">
+            {SPLASH_HEARTS.map((h, i) => (
+              <span key={i} className="presplash__heart" style={{ left: h.left, width: h.size, height: h.size, animationDelay: `${h.delay}s`, animationDuration: `${h.dur}s`, opacity: h.opacity }} />
+            ))}
+          </div>
+          <div className="presplash__petals" aria-hidden="true">
+            {SPLASH_PETALS.map((p, i) => (
+              <span key={i} className="presplash__petal" style={{ left: p.left, width: p.size, height: p.size * 0.7, background: p.color, animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`, ['--rot' as any]: `${p.rot}deg` }} />
+            ))}
+          </div>
+          <div className="presplash__ornaments" aria-hidden="true">
+            <span className="presplash__orn presplash__orn--1">✦</span>
+            <span className="presplash__orn presplash__orn--2">❀</span>
+            <span className="presplash__orn presplash__orn--3">❤</span>
+            <span className="presplash__orn presplash__orn--4">✦</span>
+            <span className="presplash__orn presplash__orn--5">❀</span>
+            <span className="presplash__orn presplash__orn--6">❤</span>
+          </div>
+          <div className="presplash__card">
+            <div className="presplash__card-glow" />
+            <p className="presplash__eyebrow">✦ &nbsp; A little surprise &nbsp; ✦</p>
+            <h1 className="presplash__title">Wrapped with love</h1>
+            <p className="presplash__sub">Something special is waiting for you</p>
+            <div className="presplash__divider"><span /><span className="presplash__divider-heart">❤</span><span /></div>
+            <button className="presplash__start" type="button" onClick={handleStart}>Start</button>
+          </div>
+        </div>
+      )}
       <div className="exp__stage" onPointerDown={handleStagePointer}>
         <div className="backdrop" aria-hidden="true">
           <div className="sky sky--dawn is-on" data-sky="dawn" />
